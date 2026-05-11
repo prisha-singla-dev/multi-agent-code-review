@@ -27,23 +27,50 @@ class ReviewState(TypedDict):
 
 def get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="models/gemini-1.5-flash",
         google_api_key=os.getenv("GEMINI_API_KEY"),
         temperature=0.1,
+        max_retries=3
     )
 
+# def get_llm() -> ChatGoogleGenerativeAI:
+#     return ChatGoogleGenerativeAI(
+#         model="models/gemini-1.5-flash-latest",
+#         google_api_key=os.getenv("GEMINI_API_KEY"),
+#         temperature=0.1,
+#         max_retries=3,
+#     )
 
+# async def run_all_agents(state: ReviewState) -> ReviewState:
+#     """Run all 4 agents in parallel."""
+#     code = state["code"]
+#     llm = get_llm()
+
+#     security, performance, logic, style = await asyncio.gather(
+#         run_security_agent(code, llm),
+#         run_performance_agent(code, llm),
+#         run_logic_agent(code, llm),
+#         run_style_agent(code, llm),
+#     )
+
+#     return {
+#         **state,
+#         "security": security,
+#         "performance": performance,
+#         "logic": logic,
+#         "style": style,
+#     }
+
+# switched to sequential only for free-tier quota management. The architecture supports true parallel execution.
 async def run_all_agents(state: ReviewState) -> ReviewState:
-    """Run all 4 agents in parallel."""
+    """Run agents sequentially to avoid rate limits on free tier."""
     code = state["code"]
     llm = get_llm()
 
-    security, performance, logic, style = await asyncio.gather(
-        run_security_agent(code, llm),
-        run_performance_agent(code, llm),
-        run_logic_agent(code, llm),
-        run_style_agent(code, llm),
-    )
+    security    = await run_security_agent(code, llm)
+    performance = await run_performance_agent(code, llm)
+    logic       = await run_logic_agent(code, llm)
+    style       = await run_style_agent(code, llm)
 
     return {
         **state,
