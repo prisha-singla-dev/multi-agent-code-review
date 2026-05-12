@@ -25,12 +25,19 @@ class ReviewState(TypedDict):
     total_issues: int
 
 
+# def get_llm() -> ChatGoogleGenerativeAI:
+#     return ChatGoogleGenerativeAI(
+#         model="gemini-1.5-flash",
+#         google_api_key=os.getenv("GEMINI_API_KEY"),
+#         temperature=0.1,
+#         max_retries=3
+#     )
+
 def get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model="models/gemini-1.5-flash",
+        model="gemini-1.5-flash-latest",
         google_api_key=os.getenv("GEMINI_API_KEY"),
         temperature=0.1,
-        max_retries=3
     )
 
 # def get_llm() -> ChatGoogleGenerativeAI:

@@ -1,49 +1,32 @@
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from backend.utils.llm import generate
 from backend.models.schemas import AgentReview, Issue
 
-SYSTEM_PROMPT = """You are an expert Performance Code Reviewer with deep knowledge of:
-- Time and space complexity (Big O analysis)
-- Database query optimization, N+1 problems
-- Memory leaks, inefficient loops, unnecessary computations
-- Caching opportunities, lazy loading
-- Async/concurrent programming best practices
+PROMPT_TEMPLATE = """You are an expert Performance Code Reviewer. Analyze ONLY for performance issues: Big O complexity, N+1 queries, memory leaks, inefficient loops, missing caching.
 
-Analyze the provided code ONLY for performance issues.
-Return a JSON object with this exact structure:
-{
-  "agent_name": "PerformanceAgent",
-  "issues": [
-    {
-      "line": "line number or null",
-      "description": "what the performance issue is",
-      "severity": "critical|high|medium|low|info",
-      "suggestion": "how to optimize it"
-    }
-  ],
-  "summary": "brief overall performance assessment",
-  "score": 85
-}
-score is 0-100 where 100 is perfectly optimized. Return ONLY valid JSON, no markdown."""
+Return raw JSON only (no markdown, no backticks):
+{{"agent_name":"PerformanceAgent","issues":[{{"line":"line number or null","description":"issue description","severity":"critical|high|medium|low|info","suggestion":"fix"}}],"summary":"brief assessment","score":85}}
+
+score 0-100 where 100 = perfectly optimized.
+
+Code:
+{code}"""
 
 
-async def run_performance_agent(code: str, llm: ChatGoogleGenerativeAI) -> AgentReview:
-    messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=f"Review this code for performance issues:\n\n{code}"),
-    ]
-    response = await llm.ainvoke(messages)
-    raw = response.content.strip()
+async def run_performance_agent(code: str) -> AgentReview:
+    raw = await generate(PROMPT_TEMPLATE.format(code=code))
+    raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    data = json.loads(raw.strip())
-    issues = [Issue(**i) for i in data.get("issues", [])]
+        raw = raw.strip()
+    if raw.endswith("```"):
+        raw = raw[:-3].strip()
+    data = json.loads(raw)
     return AgentReview(
         agent_name=data["agent_name"],
-        issues=issues,
+        issues=[Issue(**i) for i in data.get("issues", [])],
         summary=data["summary"],
         score=data["score"],
     )

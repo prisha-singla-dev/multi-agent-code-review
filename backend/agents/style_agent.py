@@ -1,49 +1,32 @@
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from backend.utils.llm import generate
 from backend.models.schemas import AgentReview, Issue
 
-SYSTEM_PROMPT = """You are an expert Code Style & Quality Reviewer with deep knowledge of:
-- PEP8, Google style guides, language idioms
-- Code readability, naming conventions
-- DRY principle, code duplication
-- Documentation, comments, type hints
-- Code organization, function length, complexity
+PROMPT_TEMPLATE = """You are an expert Code Style & Quality Reviewer. Analyze ONLY for style issues: naming conventions, PEP8, DRY violations, missing type hints, poor documentation, overly complex functions.
 
-Analyze the provided code ONLY for style and code quality issues.
-Return a JSON object with this exact structure:
-{
-  "agent_name": "StyleAgent",
-  "issues": [
-    {
-      "line": "line number or null",
-      "description": "what the style issue is",
-      "severity": "critical|high|medium|low|info",
-      "suggestion": "how to improve it"
-    }
-  ],
-  "summary": "brief overall style assessment",
-  "score": 85
-}
-score is 0-100 where 100 is perfectly styled. Return ONLY valid JSON, no markdown."""
+Return raw JSON only (no markdown, no backticks):
+{{"agent_name":"StyleAgent","issues":[{{"line":"line number or null","description":"issue description","severity":"critical|high|medium|low|info","suggestion":"fix"}}],"summary":"brief assessment","score":85}}
+
+score 0-100 where 100 = perfectly styled.
+
+Code:
+{code}"""
 
 
-async def run_style_agent(code: str, llm: ChatGoogleGenerativeAI) -> AgentReview:
-    messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=f"Review this code for style and quality issues:\n\n{code}"),
-    ]
-    response = await llm.ainvoke(messages)
-    raw = response.content.strip()
+async def run_style_agent(code: str) -> AgentReview:
+    raw = await generate(PROMPT_TEMPLATE.format(code=code))
+    raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    data = json.loads(raw.strip())
-    issues = [Issue(**i) for i in data.get("issues", [])]
+        raw = raw.strip()
+    if raw.endswith("```"):
+        raw = raw[:-3].strip()
+    data = json.loads(raw)
     return AgentReview(
         agent_name=data["agent_name"],
-        issues=issues,
+        issues=[Issue(**i) for i in data.get("issues", [])],
         summary=data["summary"],
         score=data["score"],
     )
