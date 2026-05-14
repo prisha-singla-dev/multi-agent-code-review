@@ -12,6 +12,14 @@ score 0-100 where 100 = perfectly optimized.
 Code:
 {code}"""
 
+# PROMPT_TEMPLATE = """Performance review. Find ONLY performance issues (O(n²), N+1 queries, memory leaks, slow patterns).
+
+# Return raw JSON only, no markdown:
+# {"agent_name":"PerformanceAgent","issues":[{"line":"line or null","description":"issue","severity":"critical|high|medium|low|info","suggestion":"fix"}],"summary":"one sentence","score":85}
+
+# Code:
+# {code}"""
+
 
 async def run_performance_agent(code: str) -> AgentReview:
     raw = await generate(PROMPT_TEMPLATE.format(code=code))

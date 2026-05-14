@@ -63,7 +63,7 @@ async def review_code(request: ReviewRequest):
         raise HTTPException(status_code=400, detail="Code is too short to review.")
 
     # Truncate to avoid token limits (Gemini Flash handles ~1M tokens but let's be safe)
-    code_to_review = code_to_review[:12000]
+    code_to_review = code_to_review[:2000]
 
     try:
         result = await run_review(code_to_review)

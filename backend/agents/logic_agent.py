@@ -12,6 +12,13 @@ score 0-100 where 100 = logically perfect.
 Code:
 {code}"""
 
+# PROMPT_TEMPLATE = """Logic review. Find ONLY logic bugs (edge cases, off-by-one, null handling, wrong assumptions).
+
+# Return raw JSON only, no markdown:
+# {"agent_name":"LogicAgent","issues":[{"line":"line or null","description":"issue","severity":"critical|high|medium|low|info","suggestion":"fix"}],"summary":"one sentence","score":85}
+
+# Code:
+# {code}"""
 
 async def run_logic_agent(code: str) -> AgentReview:
     raw = await generate(PROMPT_TEMPLATE.format(code=code))

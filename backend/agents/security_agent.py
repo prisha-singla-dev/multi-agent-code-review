@@ -12,21 +12,53 @@ score 0-100 where 100 = perfectly secure.
 Code:
 {code}"""
 
+# PROMPT_TEMPLATE = """Security review. Find ONLY security issues (SQL injection, XSS, auth flaws, secrets, OWASP Top 10).
+
+# Return raw JSON only, no markdown:
+# {{"agent_name":"SecurityAgent","issues":[{{"line":"line or null","description":"issue","severity":"critical|high|medium|low|info","suggestion":"fix"}}],"summary":"one sentence","score":85}}
+
+# Code:
+# {code}"""
+
+
+# async def run_security_agent(code: str) -> AgentReview:
+#     raw = await generate(PROMPT_TEMPLATE.format(code=code))
+#     raw = raw.strip()
+#     if raw.startswith("```"):
+#         raw = raw.split("```")[1]
+#         if raw.startswith("json"):
+#             raw = raw[4:]
+#         raw = raw.strip()
+#     if raw.endswith("```"):
+#         raw = raw[:-3].strip()
+#     data = json.loads(raw)
+#     return AgentReview(
+#         agent_name=data["agent_name"],
+#         issues=[Issue(**i) for i in data.get("issues", [])],
+#         summary=data["summary"],
+#         score=data["score"],
+#     )
 
 async def run_security_agent(code: str) -> AgentReview:
     raw = await generate(PROMPT_TEMPLATE.format(code=code))
     raw = raw.strip()
-    if raw.startswith("```"):
+    
+    # Strip markdown fences robustly
+    if "```" in raw:
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-        raw = raw.strip()
-    if raw.endswith("```"):
-        raw = raw[:-3].strip()
+    
+    # Extract JSON object if there's text around it
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    raw = raw[start:end]
+    
     data = json.loads(raw)
+    issues = [Issue(**i) for i in data.get("issues", [])]
     return AgentReview(
         agent_name=data["agent_name"],
-        issues=[Issue(**i) for i in data.get("issues", [])],
+        issues=issues,
         summary=data["summary"],
         score=data["score"],
     )

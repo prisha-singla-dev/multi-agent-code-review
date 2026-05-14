@@ -21,21 +21,44 @@ class ReviewState(TypedDict):
     total_issues: int
 
 
+# async def run_all_agents(state: ReviewState) -> ReviewState:
+#     """Run agents sequentially to respect free-tier RPM limits."""
+#     code = state["code"]
+
+#     security    = await run_security_agent(code)
+#     performance = await run_performance_agent(code)
+#     logic       = await run_logic_agent(code)
+#     style       = await run_style_agent(code)
+
+#     return {
+#         **state,
+#         "security": security,
+#         "performance": performance,
+#         "logic": logic,
+#         "style": style,
+#     }
+
 async def run_all_agents(state: ReviewState) -> ReviewState:
     """Run agents sequentially to respect free-tier RPM limits."""
     code = state["code"]
 
     security    = await run_security_agent(code)
+    await asyncio.sleep(5)
+
     performance = await run_performance_agent(code)
+    await asyncio.sleep(5)
+
     logic       = await run_logic_agent(code)
+    await asyncio.sleep(5)
+
     style       = await run_style_agent(code)
 
     return {
-        **state,
-        "security": security,
-        "performance": performance,
-        "logic": logic,
-        "style": style,
+        **state, 
+        "security": security, 
+        "performance": performance, 
+        "logic": logic, 
+        "style": style
     }
 
 
@@ -68,6 +91,15 @@ Write a concise 3-4 sentence final recommendation:
 1. State if the code is ready to merge (yes/no/conditional)
 2. Highlight the top 2 most critical concerns
 3. Give a clear actionable verdict"""
+    
+#     prompt = f"""Senior engineer verdict on this code review:
+# - Security {security.score}/100: {security.summary}
+# - Performance {performance.score}/100: {performance.summary}  
+# - Logic {logic.score}/100: {logic.summary}
+# - Style {style.score}/100: {style.summary}
+# Score: {overall_score}/100, Issues: {total_issues}
+
+# Give 2-3 sentence verdict: merge ready? top concerns? go/no-go."""
 
     recommendation = await generate(prompt)
 

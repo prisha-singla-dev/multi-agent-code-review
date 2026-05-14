@@ -12,6 +12,14 @@ score 0-100 where 100 = perfectly styled.
 Code:
 {code}"""
 
+# PROMPT_TEMPLATE = """Style review. Find ONLY style issues (naming, DRY violations, complexity, missing docs, PEP8).
+
+# Return raw JSON only, no markdown:
+# {"agent_name":"StyleAgent","issues":[{"line":"line or null","description":"issue","severity":"critical|high|medium|low|info","suggestion":"fix"}],"summary":"one sentence","score":85}
+
+# Code:
+# {code}"""
+
 
 async def run_style_agent(code: str) -> AgentReview:
     raw = await generate(PROMPT_TEMPLATE.format(code=code))
