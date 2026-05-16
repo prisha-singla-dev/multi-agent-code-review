@@ -38,3 +38,14 @@ async def generate(prompt: str, retries: int = 3) -> str:
                     print(f"[{model}] Error: {e}")
                     break
     raise RuntimeError("All Gemini models exhausted. Check quota at https://aistudio.google.com")
+
+def extract_json(raw: str) -> str:
+    """Extract JSON object from Gemini response, stripping markdown fences."""
+    raw = raw.strip()
+    if "```" in raw:
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    start = raw.find("{")
+    end = raw.rfind("}") + 1
+    return raw[start:end]
