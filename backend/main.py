@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from backend.utils.mock_review import get_mock_review
 
 load_dotenv()
 
@@ -65,8 +66,18 @@ async def review_code(request: ReviewRequest):
     # Truncate to avoid token limits (Gemini Flash handles ~1M tokens but let's be safe)
     code_to_review = code_to_review[:2000]
 
+    # try:
+    #     result = await run_review(code_to_review)
+    #     return result
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}")
+
     try:
-        result = await run_review(code_to_review)
+        # DEMO MODE — returns instant mock data when Gemini quota is exhausted
+        if os.getenv("DEMO_MODE", "false").lower() == "true":
+            result = get_mock_review()
+        else:
+            result = await run_review(code_to_review)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}")
