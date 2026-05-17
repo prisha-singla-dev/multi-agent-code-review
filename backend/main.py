@@ -1,6 +1,6 @@
 import os
+import logging
 from dotenv import load_dotenv
-from backend.utils.mock_review import get_mock_review
 
 load_dotenv()
 
@@ -9,6 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.models.schemas import ReviewRequest, ReviewResponse
 from backend.orchestrator.graph import run_review
 from backend.utils.github import fetch_pr_diff
+from backend.utils.mock_review import get_mock_review
+from backend.webhook import router as webhook_router
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 app = FastAPI(
     title="Multi-Agent Code Review API",
@@ -24,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount webhook router
+app.include_router(webhook_router, tags=["Webhooks"])
+
 
 @app.get("/")
 async def root():
@@ -33,7 +46,11 @@ async def root():
 @app.get("/health")
 async def health():
     api_key_set = bool(os.getenv("GEMINI_API_KEY"))
-    return {"status": "healthy", "gemini_api_key_configured": api_key_set}
+    return {
+        "status": "healthy",
+        "gemini_api_key_configured": api_key_set,
+        "demo_mode": DEMO_MODE,
+    }
 
 
 @app.post("/review", response_model=ReviewResponse)
@@ -47,6 +64,8 @@ async def review_code(request: ReviewRequest):
         raise HTTPException(
             status_code=400, detail="Provide either 'code' or 'github_pr_url'."
         )
+
+    logger.info("Review requested. Demo mode: %s", DEMO_MODE)
 
     code_to_review = request.code
 
@@ -63,21 +82,15 @@ async def review_code(request: ReviewRequest):
     if not code_to_review or len(code_to_review.strip()) < 10:
         raise HTTPException(status_code=400, detail="Code is too short to review.")
 
-    # Truncate to avoid token limits (Gemini Flash handles ~1M tokens but let's be safe)
+    # Truncate to avoid token limits
     code_to_review = code_to_review[:2000]
 
-    # try:
-    #     result = await run_review(code_to_review)
-    #     return result
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}")
-
     try:
-        # DEMO MODE — returns instant mock data when Gemini quota is exhausted
-        if os.getenv("DEMO_MODE", "false").lower() == "true":
+        if DEMO_MODE:
             result = get_mock_review()
         else:
             result = await run_review(code_to_review)
         return result
     except Exception as e:
+        logger.exception("Review pipeline failed")
         raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}")
