@@ -1,6 +1,5 @@
 """
-webhook.py — GitHub Webhook receiver for CodeSentinel
-Place this file at: backend/webhook.py
+backend/webhook.py — GitHub Webhook receiver for CodeSentinel
 """
 
 import hashlib
@@ -41,17 +40,24 @@ def verify_signature(payload_bytes: bytes, signature_header: str | None) -> bool
 
 GITHUB_API = "https://api.github.com"
 
-_HEADERS = {
+_BASE_HEADERS = {
     "Accept": "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
 
 def _auth_headers() -> dict:
-    h = dict(_HEADERS)
+    h = dict(_BASE_HEADERS)
     if GITHUB_TOKEN:
         h["Authorization"] = f"Bearer {GITHUB_TOKEN}"
     return h
+
+
+def _is_real_repo(owner: str, repo: str) -> bool:
+    """Return False for obviously fake/test repos used in local testing."""
+    fake_owners = {"demo", "test", "example"}
+    fake_repos = {"demo-repo", "my-repo", "repo", "test-repo"}
+    return owner.lower() not in fake_owners and repo.lower() not in fake_repos
 
 
 async def fetch_pr_files(owner: str, repo: str, pr_number: int) -> list[dict]:
@@ -62,7 +68,7 @@ async def fetch_pr_files(owner: str, repo: str, pr_number: int) -> list[dict]:
         return resp.json()
 
 
-async def fetch_pr_diff(owner: str, repo: str, pr_number: int) -> str:
+async def fetch_pr_diff_text(owner: str, repo: str, pr_number: int) -> str:
     url = f"{GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}"
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
@@ -81,7 +87,7 @@ async def post_pr_comment(owner: str, repo: str, pr_number: int, body: str) -> d
         return resp.json()
 
 
-# ── Review orchestration ──────────────────────────────────────────────────────
+# ── Code extraction ───────────────────────────────────────────────────────────
 
 def _build_code_from_files(files: list[dict]) -> str:
     parts: list[str] = []
@@ -90,9 +96,10 @@ def _build_code_from_files(files: list[dict]) -> str:
         patch = f.get("patch", "")
         if patch:
             parts.append(f"### {filename}\n```\n{patch}\n```")
-    combined = "\n\n".join(parts)
-    return combined[:8_000]
+    return "\n\n".join(parts)[:8_000]
 
+
+# ── Main review background task ───────────────────────────────────────────────
 
 async def run_review_and_comment(payload: dict) -> None:
     pr = payload.get("pull_request", {})
@@ -104,40 +111,65 @@ async def run_review_and_comment(payload: dict) -> None:
     pr_title = pr.get("title", "Untitled PR")
     pr_url = pr.get("html_url", "")
 
-    logger.info("Starting review for PR #%d — %s/%s", pr_number, owner, repo)
+    is_real = _is_real_repo(owner, repo)
+    logger.info(
+        "Starting review for PR #%d — %s/%s (real_repo=%s, demo_mode=%s)",
+        pr_number, owner, repo, is_real, DEMO_MODE,
+    )
 
     try:
-        if DEMO_MODE:
+        # ── Get review result ────────────────────────────────────────────────
+        if DEMO_MODE or not is_real:
+            # In demo mode OR fake test repos: use mock data, skip GitHub API
             from backend.utils.mock_review import get_mock_review
             review_result = get_mock_review()
+            logger.info("Using mock review result (demo_mode=%s, real_repo=%s)", DEMO_MODE, is_real)
         else:
-            files = await fetch_pr_files(owner, repo, pr_number)
-            code_snippet = _build_code_from_files(files)
+            # Real PR: fetch diff and run agents
+            try:
+                files = await fetch_pr_files(owner, repo, pr_number)
+                code_snippet = _build_code_from_files(files)
+            except Exception:
+                code_snippet = ""
+
             if not code_snippet.strip():
-                code_snippet = await fetch_pr_diff(owner, repo, pr_number)
+                code_snippet = await fetch_pr_diff_text(owner, repo, pr_number)
                 code_snippet = code_snippet[:8_000]
 
             from backend.orchestrator.graph import run_review
             review_result = await run_review(code_snippet)
 
+        # ── Post comment ─────────────────────────────────────────────────────
+        if not is_real:
+            # Fake repo — just log the comment, don't hit GitHub API
+            comment_body = _format_github_comment(review_result, pr_title, pr_url)
+            logger.info(
+                "DEMO/TEST — skipping GitHub API call. Comment would be:\n%s",
+                comment_body[:500] + "..." if len(comment_body) > 500 else comment_body,
+            )
+            return
+
         comment_body = _format_github_comment(review_result, pr_title, pr_url)
         result = await post_pr_comment(owner, repo, pr_number, comment_body)
-        logger.info("Comment posted: %s", result.get("html_url"))
+        logger.info("✅ Comment posted: %s", result.get("html_url"))
 
     except Exception as exc:
         logger.exception("Review failed for PR #%d: %s", pr_number, exc)
-        try:
-            await post_pr_comment(
-                owner, repo, pr_number,
-                f"⚠️ **CodeSentinel** encountered an error during review:\n```\n{exc}\n```"
-            )
-        except Exception:
-            pass
+        if is_real:
+            try:
+                await post_pr_comment(
+                    owner, repo, pr_number,
+                    f"⚠️ **CodeSentinel** encountered an error during review:\n```\n{exc}\n```",
+                )
+            except Exception:
+                pass
 
+
+# ── Formatting ────────────────────────────────────────────────────────────────
 
 def _severity_emoji(severity: str) -> str:
     return {
-        "critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢", "info": "ℹ️"
+        "critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢", "info": "ℹ️",
     }.get(severity.lower(), "⚪")
 
 
@@ -184,14 +216,14 @@ def _format_github_comment(review: Any, pr_title: str, pr_url: str) -> str:
                 if desc and desc != title:
                     lines.append(f"  > {desc}")
                 if suggestion:
-                    lines.append(f"  > *{suggestion}*")
+                    lines.append(f"  > 💡 *{suggestion}*")
         else:
             summary = agent_data.get("summary", agent_data.get("feedback", "No issues found."))
-            lines.append(f" {summary}")
+            lines.append(f"✅ {summary}")
 
         lines.append("")
 
-    lines += ["---", "### Final Recommendation", ""]
+    lines += ["---", "### 📋 Final Recommendation", ""]
     if final_summary:
         lines.append(final_summary)
     else:
@@ -205,8 +237,10 @@ def _format_github_comment(review: Any, pr_title: str, pr_url: str) -> str:
         "---",
         "*Generated by [CodeSentinel](https://github.com) — Multi-Agent AI Code Review*",
     ]
-
     return "\n".join(lines)
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/webhook/github")
 async def github_webhook(
@@ -215,6 +249,12 @@ async def github_webhook(
     x_hub_signature_256: str | None = Header(default=None),
     x_github_event: str | None = Header(default=None),
 ):
+    """
+    Receives GitHub webhook POST events.
+    Payload URL to register on GitHub: https://your-domain.ngrok-free.app/webhook/github
+                                                                            ^^^^^^^^^^^^^^^^
+                                                                            NOT the root /
+    """
     payload_bytes = await request.body()
 
     if not verify_signature(payload_bytes, x_hub_signature_256):
@@ -227,7 +267,6 @@ async def github_webhook(
 
     event = x_github_event or "unknown"
     action = payload.get("action", "")
-
     logger.info("Received GitHub event: %s / action: %s", event, action)
 
     if event == "pull_request" and action in ("opened", "synchronize", "reopened"):
@@ -236,14 +275,21 @@ async def github_webhook(
         return {"status": "accepted", "message": f"Review queued for PR #{pr_num}"}
 
     if event == "ping":
-        return {"status": "pong", "message": "Webhook connected successfully"}
+        return {"status": "pong", "message": "Webhook connected successfully ✅"}
 
     return {"status": "ignored", "event": event, "action": action}
 
 
 @router.post("/webhook/trigger")
 async def manual_trigger(request: Request, background_tasks: BackgroundTasks):
-    """Manually trigger a review without a real GitHub PR — for local testing."""
+    """
+    Manually trigger a review for local testing — no real GitHub PR needed.
+    To test against YOUR real repo, pass your actual owner/repo/pr_number.
+
+    Example body:
+        {"owner": "demo", "repo": "demo-repo", "pr_number": 1}   ← uses mock, no GitHub API
+        {"owner": "yourname", "repo": "real-repo", "pr_number": 5} ← hits real GitHub API
+    """
     body = await request.json()
     owner = body.get("owner", "demo")
     repo = body.get("repo", "demo-repo")
@@ -263,4 +309,14 @@ async def manual_trigger(request: Request, background_tasks: BackgroundTasks):
     }
 
     background_tasks.add_task(run_review_and_comment, fake_payload)
-    return {"status": "triggered", "pr_number": pr_number, "owner": owner, "repo": repo}
+    is_real = _is_real_repo(owner, repo)
+    return {
+        "status": "triggered",
+        "pr_number": pr_number,
+        "owner": owner,
+        "repo": repo,
+        "will_post_github_comment": is_real and not DEMO_MODE,
+        "note": "Using mock review (demo/test repo)" if not is_real else
+                "Using mock review (DEMO_MODE=true)" if DEMO_MODE else
+                "Running real agents + will post GitHub comment",
+    }
