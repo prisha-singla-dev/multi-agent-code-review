@@ -1,5 +1,4 @@
 import asyncio
-import os
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from backend.models.schemas import AgentReview, ReviewResponse
@@ -21,44 +20,43 @@ class ReviewState(TypedDict):
     total_issues: int
 
 
-# async def run_all_agents(state: ReviewState) -> ReviewState:
-#     """Run agents sequentially to respect free-tier RPM limits."""
-#     code = state["code"]
-
-#     security    = await run_security_agent(code)
-#     performance = await run_performance_agent(code)
-#     logic       = await run_logic_agent(code)
-#     style       = await run_style_agent(code)
-
-#     return {
-#         **state,
-#         "security": security,
-#         "performance": performance,
-#         "logic": logic,
-#         "style": style,
-#     }
-
 async def run_all_agents(state: ReviewState) -> ReviewState:
-    """Run agents sequentially to respect free-tier RPM limits."""
+    """
+    Run agents sequentially with delay to respect free-tier RPM limits.
+    Each agent is independent — a failure in one doesn't block the others.
+    """
     code = state["code"]
 
-    security    = await run_security_agent(code)
-    await asyncio.sleep(5)
+    async def safe_run(agent_fn, name: str) -> AgentReview:
+        try:
+            return await agent_fn(code)
+        except Exception as e:
+            print(f"[{name}] Agent failed entirely: {e}")
+            # Return a minimal valid AgentReview so the pipeline continues
+            return AgentReview(
+                agent_name=name,
+                issues=[],
+                summary=f"{name} encountered an error: {str(e)[:100]}",
+                score=50,
+            )
 
-    performance = await run_performance_agent(code)
-    await asyncio.sleep(5)
+    security = await safe_run(run_security_agent, "SecurityAgent")
+    await asyncio.sleep(4)
 
-    logic       = await run_logic_agent(code)
-    await asyncio.sleep(5)
+    performance = await safe_run(run_performance_agent, "PerformanceAgent")
+    await asyncio.sleep(4)
 
-    style       = await run_style_agent(code)
+    logic = await safe_run(run_logic_agent, "LogicAgent")
+    await asyncio.sleep(4)
+
+    style = await safe_run(run_style_agent, "StyleAgent")
 
     return {
-        **state, 
-        "security": security, 
-        "performance": performance, 
-        "logic": logic, 
-        "style": style
+        **state,
+        "security": security,
+        "performance": performance,
+        "logic": logic,
+        "style": style,
     }
 
 
@@ -85,23 +83,24 @@ Agent Results:
 - Logic ({logic.score}/100): {logic.summary}
 - Style ({style.score}/100): {style.summary}
 
-Total issues: {total_issues} | Overall score: {overall_score}/100
+Total issues found: {total_issues} | Overall score: {overall_score}/100
 
 Write a concise 3-4 sentence final recommendation:
 1. State if the code is ready to merge (yes/no/conditional)
 2. Highlight the top 2 most critical concerns
-3. Give a clear actionable verdict"""
-    
-#     prompt = f"""Senior engineer verdict on this code review:
-# - Security {security.score}/100: {security.summary}
-# - Performance {performance.score}/100: {performance.summary}  
-# - Logic {logic.score}/100: {logic.summary}
-# - Style {style.score}/100: {style.summary}
-# Score: {overall_score}/100, Issues: {total_issues}
+3. Give a clear actionable verdict
 
-# Give 2-3 sentence verdict: merge ready? top concerns? go/no-go."""
+Return plain text only, no JSON, no markdown headers."""
 
-    recommendation = await generate(prompt)
+    try:
+        recommendation = await generate(prompt)
+    except Exception as e:
+        recommendation = (
+            f"Review complete. Overall score: {overall_score}/100. "
+            f"Found {total_issues} issues across all agents. "
+            "Please review individual agent findings above."
+        )
+        print(f"[Synthesizer] Failed to generate recommendation: {e}")
 
     return {
         **state,
