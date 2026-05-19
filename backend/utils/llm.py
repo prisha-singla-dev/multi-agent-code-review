@@ -44,10 +44,8 @@ def get_client():
 
 async def _generate_openrouter(prompt: str) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
-    # BUG WAS HERE: `if not api_key or api_key` is always True — fixed below
     if not api_key or api_key == "your_openrouter_key_here":
         raise RuntimeError("OPENROUTER_API_KEY not set")
-
     model = os.getenv("OPENROUTER_MODEL", OPENROUTER_MODELS[0])
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -115,25 +113,29 @@ async def generate(prompt: str, retries: int = 3) -> str:
 def extract_json(raw: str) -> str:
     """
     Robustly extract a JSON object from LLM response.
-    Handles: markdown fences, truncated JSON, trailing commas, extra text.
+
+    Handles ALL of these formats Gemini returns:
+      - Raw JSON: {"agent_name": ...}
+      - Fenced:   ```json\n{"agent_name": ...}\n```
+      - Fenced:   ```\n{"agent_name": ...}\n```
+      - Truncated JSON (repaired automatically)
+      - JSON with extra text before/after
     """
     if not raw:
         return "{}"
 
     raw = raw.strip()
 
-    # Strip markdown fences — try all parts between ```
+    # ── Step 1: Strip markdown fences ────────────────────────────────────────
+    # Handle ```json ... ``` and ``` ... ``` and any variant
     if "```" in raw:
-        parts = raw.split("```")
-        for part in parts:
-            part = part.strip()
-            if part.startswith("json"):
-                part = part[4:].strip()
-            if part.startswith("{"):
-                raw = part
-                break
+        # Remove opening fence (```json or ```)
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
+        # Remove closing fence
+        raw = re.sub(r"```\s*$", "", raw, flags=re.MULTILINE)
+        raw = raw.strip()
 
-    # Find outermost { ... } by walking the string character by character
+    # ── Step 2: Find the outermost { ... } by depth-walking ──────────────────
     start = raw.find("{")
     if start == -1:
         return "{}"
@@ -164,30 +166,46 @@ def extract_json(raw: str) -> str:
                 break
 
     if end == -1:
-        # Truncated — attempt repair
+        # Truncated response — attempt repair
         return _repair_json(raw[start:])
 
-    return raw[start:end]
+    candidate = raw[start:end]
+
+    # ── Step 3: Validate — if it parses cleanly, return it ───────────────────
+    try:
+        json.loads(candidate)
+        return candidate
+    except json.JSONDecodeError:
+        return _repair_json(candidate)
 
 
 def _repair_json(broken: str) -> str:
-    """Best-effort repair of truncated JSON from LLM."""
-    # Remove trailing commas before closing braces/brackets
+    """
+    Best-effort repair of truncated or malformed JSON from LLM.
+    Handles: trailing commas, unclosed arrays/objects, mid-token truncation.
+    """
+    if not broken:
+        return "{}"
+
+    # Remove trailing commas before closing tokens
     broken = re.sub(r",\s*([}\]])", r"\1", broken)
 
-    # Strip trailing incomplete token (ends mid-key or mid-value)
+    # Strip trailing incomplete token (ends mid-string or mid-key)
     broken = broken.rstrip()
     if broken and broken[-1] not in ('"', "}", "]") and not broken[-1].isdigit():
+        # Cut back to the last safe boundary
         last_safe = max(broken.rfind(","), broken.rfind("{"), broken.rfind("["))
         if last_safe > 0:
             broken = broken[:last_safe]
 
-    # Remove any dangling trailing comma
+    # Remove any trailing comma left behind
     broken = re.sub(r",\s*$", "", broken.rstrip())
 
-    # Close unclosed arrays and objects
-    broken += "]" * (broken.count("[") - broken.count("]"))
-    broken += "}" * (broken.count("{") - broken.count("}"))
+    # Close unclosed arrays then objects (order matters)
+    open_brackets = broken.count("[") - broken.count("]")
+    open_braces = broken.count("{") - broken.count("}")
+    broken += "]" * max(open_brackets, 0)
+    broken += "}" * max(open_braces, 0)
 
     try:
         json.loads(broken)
@@ -198,28 +216,29 @@ def _repair_json(broken: str) -> str:
 
 def safe_parse(raw: str, agent_name: str) -> dict:
     """
-    Full pipeline: extract JSON → parse → return dict.
-    NEVER raises. Always returns a valid dict agents can use.
+    Full pipeline: strip fences → extract JSON → parse → return dict.
+    NEVER raises. Always returns a usable dict with all required keys set.
     """
     fallback = {
         "agent_name": agent_name,
         "issues": [],
-        "summary": f"{agent_name} could not parse LLM response. Review manually.",
+        "summary": f"{agent_name}: could not parse LLM response — review manually.",
         "score": 50,
     }
     try:
         extracted = extract_json(raw)
         if not extracted or extracted == "{}":
-            print(f"[{agent_name}] extract_json returned empty. Raw[:200]: {raw[:200]}")
+            print(f"[{agent_name}] extract_json returned empty. Raw[:300]:\n{raw[:300]}")
             return fallback
         parsed = json.loads(extracted)
         if not isinstance(parsed, dict):
             return fallback
+        # Ensure all required keys exist
         parsed.setdefault("agent_name", agent_name)
         parsed.setdefault("issues", [])
         parsed.setdefault("summary", "No summary provided.")
         parsed.setdefault("score", 50)
         return parsed
     except Exception as e:
-        print(f"[{agent_name}] safe_parse error: {e} | Raw[:300]: {raw[:300]}")
+        print(f"[{agent_name}] safe_parse error: {e}\nRaw[:300]:\n{raw[:300]}")
         return fallback
