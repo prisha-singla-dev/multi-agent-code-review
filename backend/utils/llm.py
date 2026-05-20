@@ -8,7 +8,6 @@ import asyncio
 import json
 import os
 import re
-
 import httpx
 
 try:
@@ -127,7 +126,6 @@ def extract_json(raw: str) -> str:
     raw = raw.strip()
 
     # ── Step 1: Strip markdown fences ────────────────────────────────────────
-    # Handle ```json ... ``` and ``` ... ``` and any variant
     if "```" in raw:
         # Remove opening fence (```json or ```)
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
