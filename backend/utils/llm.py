@@ -3,7 +3,6 @@ backend/utils/llm.py
 Primary:  Google Gemini (native google-genai SDK)
 Fallback: OpenRouter free models (via httpx)
 """
-
 import asyncio
 import json
 import os
@@ -112,7 +111,6 @@ async def generate(prompt: str, retries: int = 3) -> str:
 def extract_json(raw: str) -> str:
     """
     Robustly extract a JSON object from LLM response.
-
     Handles ALL of these formats Gemini returns:
       - Raw JSON: {"agent_name": ...}
       - Fenced:   ```json\n{"agent_name": ...}\n```
