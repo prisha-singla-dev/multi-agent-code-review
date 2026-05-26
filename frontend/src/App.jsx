@@ -308,7 +308,7 @@ export default function App() {
         </main>
 
         <footer className="footer">
-          <span>CodeLens</span> — Multi-Agent Code Review · LangGraph + Gemini 2.0 Flash · FastAPI
+          <span>CodeSentinel</span> — Multi-Agent Code Review · LangGraph + Gemini 2.0 Flash · FastAPI
         </footer>
       </div>
     </>
