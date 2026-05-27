@@ -239,11 +239,15 @@
 #         print(f"[{agent_name}] safe_parse error: {e}\nRaw[:300]:\n{raw[:300]}")
 #         return fallback
 
-
 """
 backend/utils/llm.py
 Primary:  Google Gemini (native google-genai SDK)
 Fallback: OpenRouter free models (via httpx)
+
+Speed strategy:
+- Try gemini-2.5-flash first (highest quota, been succeeding)
+- On 429: immediately try next model, NO waiting
+- Only wait if ALL models are exhausted once, then one short retry pass
 """
 
 import asyncio
@@ -261,12 +265,13 @@ except ImportError:
 
 _client = None
 
-# ── Reordered: put working models first to skip 429 retries ──────────────────
+# gemini-2.5-flash has highest free quota — try it first
+# gemini-2.0-flash-lite has lowest quota — try it last
 GEMINI_MODELS = [
-    "gemini-2.5-flash",       # most capable, been succeeding
-    "gemini-2.5-flash-lite",  # fast, also succeeding
-    "gemini-2.0-flash",       # fallback
-    "gemini-2.0-flash-lite",  # most rate-limited — try last
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
 ]
 
 OPENROUTER_MODELS = [
@@ -313,39 +318,66 @@ async def _generate_openrouter(prompt: str) -> str:
         return data["choices"][0]["message"]["content"].strip()
 
 
-async def generate(prompt: str, retries: int = 2) -> str:
+async def generate(prompt: str) -> str:
     """
-    retries reduced from 3 → 2 per model to fail faster and move to next model.
-    Wait times reduced: 10s, 20s instead of 15s, 30s, 45s.
+    Fast model selection strategy:
+    Pass 1 — try every model ONCE with zero waiting on 429.
+              First model that responds → return immediately.
+    Pass 2 — if all 429'd, wait 20s once, then try all again.
+    Pass 3 — try OpenRouter.
     """
     gemini_client = get_client()
 
     if gemini_client is not None:
+        # ── Pass 1: try each model once, skip immediately on 429 ─────────────
         for model in GEMINI_MODELS:
-            for attempt in range(retries):
-                try:
-                    response = gemini_client.models.generate_content(
-                        model=model,
-                        contents=prompt,
-                        config={"max_output_tokens": 800, "temperature": 0.1},
-                    )
-                    return response.text.strip()
-                except Exception as e:
-                    err = str(e)
-                    if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                        wait = (attempt + 1) * 10  # 10s, 20s  (was 15s, 30s, 45s)
-                        print(f"[Gemini/{model}] 429 — waiting {wait}s (attempt {attempt+1}/{retries})")
-                        await asyncio.sleep(wait)
-                    else:
-                        print(f"[Gemini/{model}] Error: {e} — trying next model")
-                        break
-        print("[Gemini] All models exhausted — falling back to OpenRouter")
+            try:
+                response = gemini_client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config={"max_output_tokens": 2048, "temperature": 0.1},
+                )
+                print(f"[Gemini/{model}] ✓ success")
+                return response.text.strip()
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    print(f"[Gemini/{model}] 429 — skipping to next model")
+                    continue  # immediately try next model, no sleep
+                else:
+                    print(f"[Gemini/{model}] Error: {e} — skipping")
+                    continue
 
+        # ── Pass 2: all models hit 429 — wait once, then retry all ───────────
+        print("[Gemini] All models rate-limited. Waiting 20s then retrying...")
+        await asyncio.sleep(20)
+
+        for model in GEMINI_MODELS:
+            try:
+                response = gemini_client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config={"max_output_tokens": 2048, "temperature": 0.1},
+                )
+                print(f"[Gemini/{model}] ✓ success (pass 2)")
+                return response.text.strip()
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    print(f"[Gemini/{model}] 429 again — skipping")
+                    continue
+                else:
+                    print(f"[Gemini/{model}] Error: {e} — skipping")
+                    continue
+
+        print("[Gemini] Pass 2 exhausted — falling back to OpenRouter")
+
+    # ── Pass 3: OpenRouter ────────────────────────────────────────────────────
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     if openrouter_key and openrouter_key != "your_openrouter_key_here":
         try:
             result = await _generate_openrouter(prompt)
-            print(f"[OpenRouter] Success with {os.getenv('OPENROUTER_MODEL', OPENROUTER_MODELS[0])}")
+            print(f"[OpenRouter] ✓ success")
             return result
         except Exception as e:
             print(f"[OpenRouter] Failed: {e}")
@@ -358,29 +390,20 @@ async def generate(prompt: str, retries: int = 2) -> str:
 
 
 def extract_json(raw: str) -> str:
-    """
-    Robustly extract a JSON object from LLM response.
-    Handles: markdown fences, truncated JSON, trailing commas, extra text.
-    """
     if not raw:
         return "{}"
-
     raw = raw.strip()
-
     if "```" in raw:
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
         raw = re.sub(r"```\s*$", "", raw, flags=re.MULTILINE)
         raw = raw.strip()
-
     start = raw.find("{")
     if start == -1:
         return "{}"
-
     depth = 0
     end = -1
     in_string = False
     escape_next = False
-
     for i, ch in enumerate(raw[start:], start):
         if escape_next:
             escape_next = False
@@ -400,10 +423,8 @@ def extract_json(raw: str) -> str:
             if depth == 0:
                 end = i + 1
                 break
-
     if end == -1:
         return _repair_json(raw[start:])
-
     candidate = raw[start:end]
     try:
         json.loads(candidate)
@@ -432,7 +453,6 @@ def _repair_json(broken: str) -> str:
 
 
 def safe_parse(raw: str, agent_name: str) -> dict:
-    """Never raises. Always returns a usable dict."""
     fallback = {
         "agent_name": agent_name,
         "issues": [],
