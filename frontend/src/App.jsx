@@ -69,7 +69,6 @@ html, body, #root { min-height:100vh; background:var(--bg); color:var(--text); f
   display:flex; gap:8px; align-items:flex-start; line-height:1.6;
 }
 
-/* INPUT */
 .input-panel { background:var(--bg-card); border:1px solid var(--border-med); border-radius:14px; padding:20px; }
 .mode-row { display:flex; gap:3px; margin-bottom:16px; background:var(--bg); border-radius:8px; padding:3px; border:1px solid var(--border); }
 .mbtn {
@@ -126,7 +125,6 @@ html, body, #root { min-height:100vh; background:var(--bg); color:var(--text); f
 @keyframes spin { to { transform:rotate(360deg); } }
 .spin { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.15); border-top-color:#fff; animation:spin 0.6s linear infinite; flex-shrink:0; }
 
-/* LOADING */
 .loading-wrap { padding:64px 20px; text-align:center; }
 .loading-cards { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:26px; }
 .lcard {
@@ -144,82 +142,7 @@ html, body, #root { min-height:100vh; background:var(--bg); color:var(--text); f
 .loading-msg { font-size:13px; color:var(--text-2); }
 .loading-msg strong { color:var(--accent); font-weight:500; }
 
-/* RESULTS */
 .results { display:flex; flex-direction:column; gap:11px; }
-
-.overall-card {
-  background:var(--bg-card); border:1px solid var(--border-med); border-radius:14px;
-  padding:20px 22px; display:flex; align-items:center; justify-content:space-between;
-}
-.oc-left { display:flex; align-items:center; gap:18px; }
-.oc-score { font-size:50px; font-weight:600; letter-spacing:-2px; line-height:1; }
-.oc-title { font-size:13px; font-weight:600; margin-bottom:3px; }
-.oc-sub { font-family:var(--mono); font-size:11px; color:var(--text-2); }
-.new-btn {
-  background:none; border:1px solid var(--border-med); color:var(--text-2);
-  font-family:var(--font); font-size:13px; font-weight:500; padding:8px 15px;
-  border-radius:8px; cursor:pointer; transition:all 0.12s;
-}
-.new-btn:hover { border-color:var(--accent); color:var(--accent); }
-
-.rec-card {
-  background:rgba(108,99,255,0.06); border:1px solid rgba(108,99,255,0.18);
-  border-radius:12px; padding:16px 20px;
-}
-.rec-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
-.rec-text { font-size:14px; line-height:1.7; color:var(--text); }
-
-.score-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-.stile {
-  background:var(--bg-card); border:1px solid var(--border);
-  border-radius:10px; padding:13px 10px;
-  display:flex; flex-direction:column; align-items:center; gap:5px;
-}
-.st-ic { font-size:17px; }
-.st-lbl { font-family:var(--mono); font-size:10px; color:var(--text-3); text-transform:uppercase; }
-.st-sc { font-family:var(--mono); font-size:20px; font-weight:500; }
-
-/* AGENT CARDS */
-.acard { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
-.acard-hdr {
-  padding:15px 17px; display:flex; align-items:center; justify-content:space-between;
-  cursor:pointer; transition:background 0.1s; user-select:none;
-}
-.acard-hdr:hover { background:var(--bg-hover); }
-.ah-left { display:flex; align-items:center; gap:12px; }
-.ah-icon {
-  width:38px; height:38px; border-radius:9px; background:var(--bg-input);
-  border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
-  font-size:17px; flex-shrink:0;
-}
-.ah-name { font-size:14px; font-weight:600; margin-bottom:2px; }
-.ah-desc { font-family:var(--mono); font-size:11px; color:var(--text-3); }
-.ah-right { display:flex; align-items:center; gap:11px; flex-shrink:0; }
-.chevron { font-size:10px; color:var(--text-3); transition:transform 0.18s; display:inline-block; }
-.chevron.open { transform:rotate(180deg); }
-
-/* SVG RING */
-.ring-svg { overflow:visible; }
-
-.acard-body {
-  padding:0 17px 17px; border-top:1px solid var(--border);
-  animation:fade-in 0.15s ease;
-}
-@keyframes fade-in { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:none} }
-.acard-summary {
-  font-size:13px; color:var(--text-2); line-height:1.65;
-  padding:12px 0; border-bottom:1px solid var(--border); margin-bottom:12px;
-}
-.no-issues { font-family:var(--mono); font-size:12px; color:var(--green); padding:8px 0; }
-.issues { display:flex; flex-direction:column; gap:8px; }
-.issue { border-radius:8px; padding:11px 13px; }
-.issue-top { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
-.sev-badge { font-family:var(--mono); font-size:10px; font-weight:500; padding:2px 7px; border-radius:4px; }
-.iline { font-family:var(--mono); font-size:11px; color:var(--text-3); }
-.idesc { font-size:13px; line-height:1.5; margin-bottom:7px; }
-.ifix { display:flex; gap:7px; align-items:flex-start; padding-top:7px; border-top:1px solid rgba(255,255,255,0.04); }
-.fix-lbl { font-family:var(--mono); font-size:10px; font-weight:500; color:var(--green); white-space:nowrap; flex-shrink:0; margin-top:1px; }
-.fix-txt { font-size:12px; color:var(--text-2); line-height:1.5; }
 
 .footer { text-align:center; padding:22px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11px; color:var(--text-3); }
 .footer span { color:var(--text-2); }
@@ -227,9 +150,7 @@ html, body, #root { min-height:100vh; background:var(--bg); color:var(--text); f
 @media(max-width:600px){
   .header{padding:0 16px}
   .main{padding:0 14px 60px}
-  .score-row{grid-template-columns:repeat(2,1fr)}
   .hbadge:not(.live){display:none}
-  .overall-card{flex-direction:column;align-items:flex-start;gap:14px}
 }
 `
 
@@ -269,12 +190,13 @@ export default function App() {
         <header className="header">
           <div className="logo">
             <div className="logo-box">🔍</div>
-            <div className="logo-name">Code<em>Lens</em></div>
+            {/* FIX: CodeLens → CodeSentinel */}
+            <div className="logo-name">Code<em>Sentinel</em></div>
           </div>
           <div className="hdr-badges">
             <span className="hbadge live">API Live</span>
             <span className="hbadge">4 Agents</span>
-            <span className="hbadge">Gemini 2.0 Flash</span>
+            <span className="hbadge">Gemini 2.5 Flash</span>
           </div>
         </header>
 
@@ -282,7 +204,7 @@ export default function App() {
           <div className="hero">
             <div className="hero-eyebrow">Multi-Agent AI System</div>
             <h1 className="hero-h1">Code Review<br /><em>Powered by AI Agents</em></h1>
-            <p className="hero-sub">Four specialized agents analyze your code in parallel — security vulnerabilities, performance bottlenecks, logic errors, and style issues.</p>
+            <p className="hero-sub">Four specialized agents analyze your code — security vulnerabilities, performance bottlenecks, logic errors, and style issues.</p>
             <div className="agent-tags">
               {[['🛡','SecurityAgent'],['⚡','PerformanceAgent'],['🧠','LogicAgent'],['✦','StyleAgent']].map(([ic,nm]) => (
                 <span className="atag" key={nm}>{ic} {nm}</span>
@@ -293,7 +215,7 @@ export default function App() {
 
         <main className="main">
           {error && <div className="err-bar"><span>⚠</span><span>{error}</span></div>}
-          {phase === 'input' && <CodeInput onSubmit={handleSubmit} />}
+          {phase === 'input'   && <CodeInput onSubmit={handleSubmit} />}
           {phase === 'loading' && (
             <div className="loading-wrap">
               <div className="loading-cards">
@@ -301,14 +223,14 @@ export default function App() {
                   <div className="lcard" key={nm}><span className="lc-ic">{ic}</span><span className="lc-nm">{nm}</span></div>
                 ))}
               </div>
-              <div className="loading-msg">Running <strong>4 agents in parallel</strong> via LangGraph...</div>
+              <div className="loading-msg">Running <strong>4 specialized agents</strong> via LangGraph...</div>
             </div>
           )}
           {phase === 'results' && result && <ReviewResults result={result} onReset={handleReset} />}
         </main>
 
         <footer className="footer">
-          <span>CodeSentinel</span> — Multi-Agent Code Review · LangGraph + Gemini 2.0 Flash · FastAPI
+          <span>CodeSentinel</span> — Multi-Agent Code Review · LangGraph + Gemini 2.5 Flash · FastAPI
         </footer>
       </div>
     </>
