@@ -12,13 +12,11 @@ Make sure your FastAPI server is running:
 """
 
 import requests
-
 # ── EDIT THESE 3 VALUES ───────────────────────────────────────────────────────
 OWNER     = "prisha-singla-dev"               # your GitHub username
 REPO      = "multi-agent-code-review"  # your repo name (exact, case-sensitive)
 PR_NUMBER = 1                                # the PR number (check the URL: /pull/1)
 # ─────────────────────────────────────────────────────────────────────────────
-
 BASE_URL = "http://localhost:8000"
 
 def trigger():
