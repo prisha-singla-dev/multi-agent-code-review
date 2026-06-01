@@ -10,7 +10,7 @@ Usage:
 Make sure your FastAPI server is running:
     uvicorn backend.main:app --reload --port 8000
 """
-
+# implemented logging
 import requests
 # ── EDIT THESE 3 VALUES ───────────────────────────────────────────────────────
 OWNER     = "prisha-singla-dev"               # your GitHub username
