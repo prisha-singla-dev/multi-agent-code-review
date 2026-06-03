@@ -83,7 +83,7 @@ async def review_code(request: ReviewRequest):
         raise HTTPException(status_code=400, detail="Code is too short to review.")
 
     # Truncate to avoid token limits
-    code_to_review = code_to_review[:800]
+    code_to_review = code_to_review[:2000]
 
     try:
         if DEMO_MODE:
