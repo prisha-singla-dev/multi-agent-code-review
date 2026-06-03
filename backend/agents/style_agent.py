@@ -1,12 +1,14 @@
 from backend.utils.llm import generate, safe_parse
 from backend.models.schemas import AgentReview, Issue
 
-PROMPT_TEMPLATE = """You are a Code Style Reviewer. Find ONLY style issues: naming conventions, PEP8, DRY violations, missing type hints, poor documentation.
+PROMPT_TEMPLATE = """You are a Code Style Reviewer. Find the top 5 most critical style issues only.
 
-Respond with ONLY a JSON object. No extra text, no markdown fences, no backticks.
-Keep descriptions under 20 words. Keep suggestions under 15 words.
+Return ONLY a raw JSON object. No markdown. No backticks. No explanation. Just JSON.
 
-{{"agent_name":"StyleAgent","issues":[{{"line":"line number or null","description":"issue","severity":"critical|high|medium|low|info","suggestion":"fix"}}],"summary":"one sentence max","score":85}}
+Format exactly:
+{{"agent_name":"StyleAgent","issues":[{{"line":"line number or null","description":"brief issue description under 15 words","severity":"critical|high|medium|low|info","suggestion":"brief fix under 15 words"}}],"summary":"one sentence summary","score":50}}
+
+score: 0-100 (100 = perfectly styled)
 
 Code to review:
 {code}"""
@@ -25,5 +27,5 @@ async def run_style_agent(code: str) -> AgentReview:
         agent_name=data["agent_name"],
         issues=issues,
         summary=data["summary"],
-        score=int(str(data["score"]).strip()) if str(data["score"]).strip().isdigit() else 50,
+        score=int(data["score"]) if str(data.get("score", 50)).lstrip('-').isdigit() else 50,
     )
