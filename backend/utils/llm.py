@@ -13,13 +13,13 @@ import httpx
 
 try:
     from google import genai as _genai
+    from google.genai import types as _genai_types
     _GENAI_AVAILABLE = True
 except ImportError:
     _GENAI_AVAILABLE = False
 
 _client = None
 
-# Best models first — 2.5-flash succeeds consistently, lite is faster backup
 GEMINI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
@@ -45,7 +45,6 @@ def get_client():
 
 async def _generate_openrouter(prompt: str) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
-    # FIX: was `if not api_key or api_key` — always True, OpenRouter never worked
     if not api_key or api_key == "your_openrouter_key_here":
         raise RuntimeError("OPENROUTER_API_KEY not set")
     model = os.getenv("OPENROUTER_MODEL", OPENROUTER_MODELS[0])
@@ -58,7 +57,7 @@ async def _generate_openrouter(prompt: str) -> str:
     body = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000,
+        "max_tokens": 4000,
         "temperature": 0.1,
     }
     async with httpx.AsyncClient(timeout=60) as client:
@@ -79,33 +78,49 @@ async def generate(prompt: str, retries: int = 2) -> str:
         for model in GEMINI_MODELS:
             for attempt in range(retries):
                 try:
+                    # KEY FIX: response_mime_type="application/json" tells Gemini
+                    # to output ONLY valid JSON — no markdown fences, no truncation
+                    # of the JSON structure itself. Also raised to 4000 tokens.
+                    try:
+                        config = _genai_types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            max_output_tokens=4000,
+                            temperature=0.1,
+                        )
+                    except Exception:
+                        # Fallback if types module unavailable
+                        config = {
+                            "max_output_tokens": 4000,
+                            "temperature": 0.1,
+                        }
+
                     response = gemini_client.models.generate_content(
                         model=model,
                         contents=prompt,
-                        config={
-                            # FIX: was 600 — too small, JSON gets truncated mid-issue
-                            # Security agent with 6 issues needs ~1500 tokens
-                            "max_output_tokens": 2000,
-                            "temperature": 0.1,
-                        },
+                        config=config,
                     )
-                    return response.text.strip()
+                    text = response.text.strip() if response.text else ""
+                    if text:
+                        return text
+                    print(f"[Gemini/{model}] Empty response — trying next model")
+                    break
                 except Exception as e:
                     err = str(e)
                     if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                        wait = (attempt + 1) * 10  # 10s, 20s
+                        wait = (attempt + 1) * 10
                         print(f"[Gemini/{model}] 429 — waiting {wait}s (attempt {attempt+1}/{retries})")
                         await asyncio.sleep(wait)
                     else:
                         print(f"[Gemini/{model}] Error: {e} — trying next model")
                         break
+
         print("[Gemini] All models exhausted — falling back to OpenRouter")
 
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     if openrouter_key and openrouter_key != "your_openrouter_key_here":
         try:
             result = await _generate_openrouter(prompt)
-            print(f"[OpenRouter] Success with {os.getenv('OPENROUTER_MODEL', OPENROUTER_MODELS[0])}")
+            print(f"[OpenRouter] Success")
             return result
         except Exception as e:
             print(f"[OpenRouter] Failed: {e}")
@@ -119,31 +134,34 @@ async def generate(prompt: str, retries: int = 2) -> str:
 
 def extract_json(raw: str) -> str:
     """
-    Robustly extract JSON from LLM response.
-
-    FIX: Old version used raw.rfind('}') which silently returned wrong slice
-    when JSON was truncated — gave back partial JSON that looked valid but
-    had missing closing braces, causing json.loads to fail downstream.
-
-    New version: depth-walks character by character to find the TRUE closing
-    brace, then repairs if truncated.
+    Extract JSON from LLM response.
+    With response_mime_type=application/json, Gemini returns raw JSON directly.
+    This still handles legacy/fallback cases with markdown fences.
     """
     if not raw:
         return "{}"
 
     raw = raw.strip()
 
-    # Strip ALL markdown fence variants: ```json, ```python, ``` etc.
+    # Strip markdown fences if present (shouldn't happen with mime_type set)
     if "```" in raw:
         raw = re.sub(r"```(?:json|python|javascript)?\s*", "", raw)
         raw = re.sub(r"```", "", raw)
         raw = raw.strip()
 
+    # If it starts with { directly — common with application/json mode
+    if raw.startswith("{"):
+        try:
+            json.loads(raw)
+            return raw  # Already valid JSON
+        except json.JSONDecodeError:
+            pass  # Fall through to depth walker
+
     start = raw.find("{")
     if start == -1:
         return "{}"
 
-    # Walk character by character tracking depth — this is the only reliable way
+    # Depth-walk to find true closing brace
     depth = 0
     end = -1
     in_string = False
@@ -170,7 +188,6 @@ def extract_json(raw: str) -> str:
                 break
 
     if end == -1:
-        # JSON truncated by token limit — attempt repair
         return _repair_json(raw[start:])
 
     candidate = raw[start:end]
@@ -182,26 +199,17 @@ def extract_json(raw: str) -> str:
 
 
 def _repair_json(broken: str) -> str:
-    """Repair truncated JSON from token-limit cutoffs."""
     if not broken:
         return "{}"
-
-    # Remove trailing commas before closing tokens
     broken = re.sub(r",\s*([}\]])", r"\1", broken)
-
-    # Strip trailing incomplete token (mid-string or mid-key)
     broken = broken.rstrip()
     if broken and broken[-1] not in ('"', "}", "]") and not broken[-1].isdigit():
         last_safe = max(broken.rfind(","), broken.rfind("{"), broken.rfind("["))
         if last_safe > 0:
             broken = broken[:last_safe]
-
     broken = re.sub(r",\s*$", "", broken.rstrip())
-
-    # Close unclosed arrays then objects
     broken += "]" * max(broken.count("[") - broken.count("]"), 0)
     broken += "}" * max(broken.count("{") - broken.count("}"), 0)
-
     try:
         json.loads(broken)
         return broken
@@ -210,20 +218,18 @@ def _repair_json(broken: str) -> str:
 
 
 def safe_parse(raw: str, agent_name: str) -> dict:
-    """
-    Full pipeline: extract JSON → parse → return dict.
-    Never raises. Always returns a usable dict with all required keys.
-    """
+    """Never raises. Always returns a usable dict."""
     fallback = {
         "agent_name": agent_name,
         "issues": [],
-        "summary": f"{agent_name}: could not parse LLM response — review manually.",
+        "summary": f"{agent_name}: could not parse LLM response.",
         "score": 50,
     }
     try:
         extracted = extract_json(raw)
         if not extracted or extracted == "{}":
-            print(f"[{agent_name}] extract_json empty. Raw (first 400 chars):\n{raw[:400]}\n---")
+            # Print full raw for debugging (not truncated)
+            print(f"[{agent_name}] extract_json empty.\nFull raw ({len(raw)} chars):\n{raw}\n---")
             return fallback
         parsed = json.loads(extracted)
         if not isinstance(parsed, dict):
@@ -234,5 +240,5 @@ def safe_parse(raw: str, agent_name: str) -> dict:
         parsed.setdefault("score", 50)
         return parsed
     except Exception as e:
-        print(f"[{agent_name}] safe_parse error: {e}\nRaw (first 400):\n{raw[:400]}\n---")
+        print(f"[{agent_name}] safe_parse error: {e}\nFull raw ({len(raw)} chars):\n{raw}\n---")
         return fallback
