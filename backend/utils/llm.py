@@ -8,7 +8,6 @@ import asyncio
 import json
 import os
 import re
-
 import httpx
 
 try:
@@ -78,9 +77,6 @@ async def generate(prompt: str, retries: int = 2) -> str:
         for model in GEMINI_MODELS:
             for attempt in range(retries):
                 try:
-                    # KEY FIX: response_mime_type="application/json" tells Gemini
-                    # to output ONLY valid JSON — no markdown fences, no truncation
-                    # of the JSON structure itself. Also raised to 4000 tokens.
                     try:
                         config = _genai_types.GenerateContentConfig(
                             response_mime_type="application/json",
