@@ -12,15 +12,41 @@ Code:
 {code}"""
 
 
+def _coerce_issue(i: dict) -> Issue | None:
+    try:
+        line_val = i.get("line")
+        if line_val is not None:
+            line_val = str(line_val)
+
+        return Issue(
+            line=line_val,
+            description=str(i.get("description", "")).strip() or "No description provided",
+            severity=str(i.get("severity", "info")).lower().strip(),
+            suggestion=str(i.get("suggestion", "")).strip() or "No suggestion provided",
+        )
+    except Exception as e:
+        print(f"[LogicAgent] _coerce_issue failed for {i}: {e}")
+        return None
+
+
 async def run_logic_agent(code: str) -> AgentReview:
     raw = await generate(PROMPT_TEMPLATE.replace("{code}", code))
     data = safe_parse(raw, "LogicAgent")
+
+    raw_issues = data.get("issues", [])
+    print(f"[LogicAgent] Parsed {len(raw_issues)} raw issues from LLM")
+
     issues = []
-    for i in data.get("issues", []):
-        try:
-            issues.append(Issue(**{k: v for k, v in i.items() if k in Issue.model_fields}))
-        except Exception:
-            pass
+    for i in raw_issues:
+        if not isinstance(i, dict):
+            print(f"[LogicAgent] Skipping non-dict issue: {i}")
+            continue
+        issue = _coerce_issue(i)
+        if issue:
+            issues.append(issue)
+
+    print(f"[LogicAgent] Successfully built {len(issues)} Issue objects")
+
     return AgentReview(
         agent_name=data["agent_name"],
         issues=issues,

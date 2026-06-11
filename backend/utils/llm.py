@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import re
+
 import httpx
 
 try:
@@ -70,25 +71,28 @@ async def _generate_openrouter(prompt: str) -> str:
         return data["choices"][0]["message"]["content"].strip()
 
 
-async def generate(prompt: str, retries: int = 2) -> str:
+async def generate(prompt: str, retries: int = 2, json_mode: bool = True) -> str:
+    """
+    json_mode=True  -> sets response_mime_type=application/json (for agent prompts)
+    json_mode=False -> plain text response (for synthesizer recommendation)
+    """
     gemini_client = get_client()
 
     if gemini_client is not None:
         for model in GEMINI_MODELS:
             for attempt in range(retries):
                 try:
+                    config_kwargs = {
+                        "max_output_tokens": 4000,
+                        "temperature": 0.1,
+                    }
+                    if json_mode:
+                        config_kwargs["response_mime_type"] = "application/json"
+
                     try:
-                        config = _genai_types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            max_output_tokens=4000,
-                            temperature=0.1,
-                        )
+                        config = _genai_types.GenerateContentConfig(**config_kwargs)
                     except Exception:
-                        # Fallback if types module unavailable
-                        config = {
-                            "max_output_tokens": 4000,
-                            "temperature": 0.1,
-                        }
+                        config = config_kwargs
 
                     response = gemini_client.models.generate_content(
                         model=model,
@@ -129,35 +133,27 @@ async def generate(prompt: str, retries: int = 2) -> str:
 
 
 def extract_json(raw: str) -> str:
-    """
-    Extract JSON from LLM response.
-    With response_mime_type=application/json, Gemini returns raw JSON directly.
-    This still handles legacy/fallback cases with markdown fences.
-    """
     if not raw:
         return "{}"
 
     raw = raw.strip()
 
-    # Strip markdown fences if present (shouldn't happen with mime_type set)
     if "```" in raw:
         raw = re.sub(r"```(?:json|python|javascript)?\s*", "", raw)
         raw = re.sub(r"```", "", raw)
         raw = raw.strip()
 
-    # If it starts with { directly — common with application/json mode
     if raw.startswith("{"):
         try:
             json.loads(raw)
-            return raw  # Already valid JSON
+            return raw
         except json.JSONDecodeError:
-            pass  # Fall through to depth walker
+            pass
 
     start = raw.find("{")
     if start == -1:
         return "{}"
 
-    # Depth-walk to find true closing brace
     depth = 0
     end = -1
     in_string = False
@@ -193,7 +189,7 @@ def extract_json(raw: str) -> str:
     except json.JSONDecodeError:
         return _repair_json(candidate)
 
-# fixing json 
+
 def _repair_json(broken: str) -> str:
     if not broken:
         return "{}"
@@ -214,7 +210,6 @@ def _repair_json(broken: str) -> str:
 
 
 def safe_parse(raw: str, agent_name: str) -> dict:
-    """Never raises. Always returns a usable dict."""
     fallback = {
         "agent_name": agent_name,
         "issues": [],
@@ -224,7 +219,6 @@ def safe_parse(raw: str, agent_name: str) -> dict:
     try:
         extracted = extract_json(raw)
         if not extracted or extracted == "{}":
-            # Print full raw for debugging (not truncated)
             print(f"[{agent_name}] extract_json empty.\nFull raw ({len(raw)} chars):\n{raw}\n---")
             return fallback
         parsed = json.loads(extracted)
@@ -234,6 +228,12 @@ def safe_parse(raw: str, agent_name: str) -> dict:
         parsed.setdefault("issues", [])
         parsed.setdefault("summary", "No summary provided.")
         parsed.setdefault("score", 50)
+
+        # Defensive: if "issues" itself isn't a list, force empty list
+        if not isinstance(parsed["issues"], list):
+            print(f"[{agent_name}] 'issues' field is not a list: {type(parsed['issues'])} — {parsed['issues']}")
+            parsed["issues"] = []
+
         return parsed
     except Exception as e:
         print(f"[{agent_name}] safe_parse error: {e}\nFull raw ({len(raw)} chars):\n{raw}\n---")
