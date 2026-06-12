@@ -6,8 +6,19 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/review': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-    }
-  }
+      // Local dev only — proxies /review and /webhook to local FastAPI
+      '/review': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/webhook': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/health': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

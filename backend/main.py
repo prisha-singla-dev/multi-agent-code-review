@@ -26,15 +26,24 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# ── CORS ────────────────────────────────────────────────────────────────────
+# Reads allowed origins from env var (comma-separated).
+# In production, set ALLOWED_ORIGINS=https://your-frontend.vercel.app
+# Falls back to "*" for local development.
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+if allowed_origins_env == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in allowed_origins_env.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount webhook router
 app.include_router(webhook_router, tags=["Webhooks"])
 
 
@@ -55,11 +64,6 @@ async def health():
 
 @app.post("/review", response_model=ReviewResponse)
 async def review_code(request: ReviewRequest):
-    """
-    Submit code or a GitHub PR URL for multi-agent review.
-    - Provide `code` directly, OR
-    - Provide `github_pr_url` to fetch from GitHub
-    """
     if not request.code and not request.github_pr_url:
         raise HTTPException(
             status_code=400, detail="Provide either 'code' or 'github_pr_url'."
@@ -82,7 +86,6 @@ async def review_code(request: ReviewRequest):
     if not code_to_review or len(code_to_review.strip()) < 10:
         raise HTTPException(status_code=400, detail="Code is too short to review.")
 
-    # Truncate to avoid token limits
     code_to_review = code_to_review[:2000]
 
     try:
