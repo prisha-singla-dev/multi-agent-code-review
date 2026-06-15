@@ -163,7 +163,8 @@ export default function App() {
     setPhase('loading')
     setError(null)
     try {
-      const res = await fetch('/review', {
+      const API_URL = import.meta.env.VITE_API_URL || ''
+      const res = await fetch(`${API_URL}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
