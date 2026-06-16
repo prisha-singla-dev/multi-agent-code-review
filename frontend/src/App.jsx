@@ -191,7 +191,6 @@ export default function App() {
         <header className="header">
           <div className="logo">
             <div className="logo-box">🔍</div>
-            {/* FIX: CodeLens → CodeSentinel */}
             <div className="logo-name">Code<em>Sentinel</em></div>
           </div>
           <div className="hdr-badges">

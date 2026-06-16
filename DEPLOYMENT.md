@@ -11,7 +11,6 @@ Both free tier. Total time: ~20 minutes.
 ```powershell
 git add .
 git commit -m "feat: Phase 4 - prepare for Render + Vercel deployment
-
 - Add render.yaml with build/start commands and env var placeholders
 - Make CORS origins configurable via ALLOWED_ORIGINS env var
 - Add frontend .env files for dev/prod API URL switching
