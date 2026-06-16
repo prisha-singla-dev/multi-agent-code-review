@@ -11,7 +11,7 @@ Server must be running: uvicorn backend.main:app --reload --port 8000
 import json
 import requests
 
-# Small sample of bad code — enough to trigger all agents
+# Small sample of bad code - enough to trigger all agents
 CODE = '''
 import os, subprocess
 API_KEY = "sk-prod-abc123"

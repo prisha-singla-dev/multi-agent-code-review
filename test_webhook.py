@@ -1,5 +1,5 @@
 """
-test_webhook.py — Local webhook test suite
+test_webhook.py - Local webhook test suite
 Run from project ROOT:
     python test_webhook.py
 
@@ -63,7 +63,7 @@ def test_ping():
 
 
 def test_pr_opened_fake():
-    sep("3. PR opened (fake repo — no GitHub API call, logs comment to console)")
+    sep("3. PR opened (fake repo - no GitHub API call, logs comment to console)")
     payload = {
         "action": "opened",
         "pull_request": {
@@ -87,12 +87,12 @@ def test_pr_opened_fake():
         },
     )
     print(f"  → {resp.status_code} {resp.json()}")
-    print("  ✅ Check server terminal — it will LOG the review comment (not post to GitHub)")
+    print("  ✅ Check server terminal - it will LOG the review comment (not post to GitHub)")
     assert resp.status_code == 200
 
 
 def test_manual_trigger_fake():
-    sep("4. Manual trigger (fake repo — logs to server terminal)")
+    sep("4. Manual trigger (fake repo - logs to server terminal)")
     resp = requests.post(
         f"{BASE_URL}/webhook/trigger",
         json={"owner": "demo", "repo": "demo-repo", "pr_number": 7},
@@ -137,7 +137,7 @@ def test_ignored_event():
 
 if __name__ == "__main__":
     print("=" * 55)
-    print("  CodeSentinel — Webhook Test Suite")
+    print("  CodeSentinel - Webhook Test Suite")
     print("=" * 55)
     print(f"  Target: {BASE_URL}")
     print(f"  Secret: {'*' * (len(WEBHOOK_SECRET) - 4) + WEBHOOK_SECRET[-4:]}")

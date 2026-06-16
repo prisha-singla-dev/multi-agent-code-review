@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      // Local dev only — proxies /review and /webhook to local FastAPI
+      // Local dev only - proxies /review and /webhook to local FastAPI
       '/review': {
         target: 'http://localhost:8000',
         changeOrigin: true,

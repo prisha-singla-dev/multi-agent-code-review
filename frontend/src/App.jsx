@@ -204,7 +204,7 @@ export default function App() {
           <div className="hero">
             <div className="hero-eyebrow">Multi-Agent AI System</div>
             <h1 className="hero-h1">Code Review<br /><em>Powered by AI Agents</em></h1>
-            <p className="hero-sub">Four specialized agents analyze your code — security vulnerabilities, performance bottlenecks, logic errors, and style issues.</p>
+            <p className="hero-sub">Four specialized agents analyze your code - security vulnerabilities, performance bottlenecks, logic errors, and style issues.</p>
             <div className="agent-tags">
               {[['🛡','SecurityAgent'],['⚡','PerformanceAgent'],['🧠','LogicAgent'],['✦','StyleAgent']].map(([ic,nm]) => (
                 <span className="atag" key={nm}>{ic} {nm}</span>
@@ -230,7 +230,7 @@ export default function App() {
         </main>
 
         <footer className="footer">
-          <span>CodeSentinel</span> — Multi-Agent Code Review · LangGraph + Gemini 2.5 Flash · FastAPI
+          <span>CodeSentinel</span> - Multi-Agent Code Review · LangGraph + Gemini 2.5 Flash · FastAPI
         </footer>
       </div>
     </>

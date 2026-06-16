@@ -102,19 +102,19 @@ async def generate(prompt: str, retries: int = 2, json_mode: bool = True) -> str
                     text = response.text.strip() if response.text else ""
                     if text:
                         return text
-                    print(f"[Gemini/{model}] Empty response — trying next model")
+                    print(f"[Gemini/{model}] Empty response - trying next model")
                     break
                 except Exception as e:
                     err = str(e)
                     if "429" in err or "RESOURCE_EXHAUSTED" in err:
                         wait = (attempt + 1) * 10
-                        print(f"[Gemini/{model}] 429 — waiting {wait}s (attempt {attempt+1}/{retries})")
+                        print(f"[Gemini/{model}] 429 - waiting {wait}s (attempt {attempt+1}/{retries})")
                         await asyncio.sleep(wait)
                     else:
-                        print(f"[Gemini/{model}] Error: {e} — trying next model")
+                        print(f"[Gemini/{model}] Error: {e} - trying next model")
                         break
 
-        print("[Gemini] All models exhausted — falling back to OpenRouter")
+        print("[Gemini] All models exhausted - falling back to OpenRouter")
 
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
     if openrouter_key and openrouter_key != "your_openrouter_key_here":
@@ -231,7 +231,7 @@ def safe_parse(raw: str, agent_name: str) -> dict:
 
         # Defensive: if "issues" itself isn't a list, force empty list
         if not isinstance(parsed["issues"], list):
-            print(f"[{agent_name}] 'issues' field is not a list: {type(parsed['issues'])} — {parsed['issues']}")
+            print(f"[{agent_name}] 'issues' field is not a list: {type(parsed['issues'])} - {parsed['issues']}")
             parsed["issues"] = []
 
         return parsed

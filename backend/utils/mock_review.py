@@ -37,7 +37,7 @@ def get_mock_review() -> ReviewResponse:
                     line="18",
                     severity=Severity.HIGH,
                     description="Full table scan in get_user_data(): fetches ALL users from DB then filters in Python. O(n) memory, O(n) time.",
-                    suggestion="Query directly: cursor.execute('SELECT * FROM users WHERE id=?', (user_id,)) — O(1) with indexed id."
+                    suggestion="Query directly: cursor.execute('SELECT * FROM users WHERE id=?', (user_id,)) - O(1) with indexed id."
                 ),
                 Issue(
                     line="23",
@@ -103,7 +103,7 @@ def get_mock_review() -> ReviewResponse:
                 ),
             ]
         ),
-        final_recommendation="❌ Do NOT merge. This code has a critical SQL injection vulnerability (line 3) that allows complete authentication bypass — this is a P0 security issue. Additionally, the O(n²) loop and full table scan will cause severe performance degradation at scale. Fix the SQL injection with parameterized queries, replace the token generation with secrets.token_hex(32), and rewrite get_user_data() to query by ID directly. Re-submit for review after these three issues are resolved.",
+        final_recommendation="❌ Do NOT merge. This code has a critical SQL injection vulnerability (line 3) that allows complete authentication bypass - this is a P0 security issue. Additionally, the O(n²) loop and full table scan will cause severe performance degradation at scale. Fix the SQL injection with parameterized queries, replace the token generation with secrets.token_hex(32), and rewrite get_user_data() to query by ID directly. Re-submit for review after these three issues are resolved.",
         overall_score=47,
         total_issues=9,
     )

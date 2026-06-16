@@ -1,6 +1,6 @@
-# 🤖 CodeSentinel — Multi-Agent AI Code Review System
+# 🤖 CodeSentinel - Multi-Agent AI Code Review System
 
-> Automated code review powered by 4 specialized AI agents. Paste code or connect a GitHub PR — get a structured review with severity levels, line-specific findings, and a final engineering verdict in seconds.
+> Automated code review powered by 4 specialized AI agents. Paste code or connect a GitHub PR - get a structured review with severity levels, line-specific findings, and a final engineering verdict in seconds.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)
@@ -58,14 +58,14 @@ SecurityAgent  PerformanceAgent  LogicAgent  StyleAgent
 
 ## 🚀 Features
 
-- **4 specialized AI agents** — each focused on one review dimension
-- **LangGraph orchestration** — sequential pipeline with error recovery per agent
-- **GitHub webhook integration** — auto-reviews every PR on open/sync/reopen
-- **GitHub PR comment** — posts structured Markdown review directly on the PR
-- **React frontend** — paste code or enter a GitHub PR URL for instant review
-- **Severity levels** — CRITICAL / HIGH / MEDIUM / LOW / INFO with line numbers
-- **Model fallback chain** — Gemini 2.5 Flash → 2.5 Flash Lite → 2.0 Flash → OpenRouter free
-- **Demo mode** — instant mock responses for demos without API quota
+- **4 specialized AI agents** - each focused on one review dimension
+- **LangGraph orchestration** - sequential pipeline with error recovery per agent
+- **GitHub webhook integration** - auto-reviews every PR on open/sync/reopen
+- **GitHub PR comment** - posts structured Markdown review directly on the PR
+- **React frontend** - paste code or enter a GitHub PR URL for instant review
+- **Severity levels** - CRITICAL / HIGH / MEDIUM / LOW / INFO with line numbers
+- **Model fallback chain** - Gemini 2.5 Flash → 2.5 Flash Lite → 2.0 Flash → OpenRouter free
+- **Demo mode** - instant mock responses for demos without API quota
 
 ---
 
@@ -158,7 +158,7 @@ To get automatic PR reviews posted as comments:
    - Secret: your `GITHUB_WEBHOOK_SECRET`
    - Events: **Pull requests** only
 
-3. **Open a PR** — CodeSentinel automatically posts a structured review comment.
+3. **Open a PR** - CodeSentinel automatically posts a structured review comment.
 
 See [WEBHOOK_SETUP.md](./WEBHOOK_SETUP.md) for detailed instructions.
 
@@ -234,11 +234,11 @@ DEMO_MODE=true
 
 **Sample review output:**
 ```
-🔒 Security Agent — Score: 10/100
+🔒 Security Agent - Score: 10/100
   🔴 [CRITICAL] (line 12) Hardcoded API key found
      💡 Use os.getenv('API_KEY') instead
 
-⚡ Performance Agent — Score: 60/100
+⚡ Performance Agent - Score: 60/100
   🟠 [HIGH] (line 44) O(n²) complexity in find_duplicates
      💡 Use a set for O(n) duplicate detection
 
@@ -262,12 +262,12 @@ Deployment guide coming soon.
 
 ## 📄 License
 
-MIT — free to use, fork, and build on.
+MIT - free to use, fork, and build on.
 
 ---
 
 ## 🙋 Author
 
-**Prisha Singla** — [GitHub](https://github.com/prisha-singla-dev)
+**Prisha Singla** - [GitHub](https://github.com/prisha-singla-dev)
 
 Built as a portfolio project demonstrating multi-agent AI system design, LangGraph orchestration, and production-grade API development.

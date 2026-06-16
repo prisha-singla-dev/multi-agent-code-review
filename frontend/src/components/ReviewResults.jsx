@@ -49,7 +49,7 @@ function AgentCard({ agentKey, data }) {
   const [open, setOpen] = useState(true)
   const meta = AGENTS[agentKey]
 
-  // ── FIX 2: defensively normalise data — backend may return objects or nulls ─
+  // ── FIX 2: defensively normalise data - backend may return objects or nulls ─
   const score  = data?.score  ?? 50
   const summary = data?.summary ?? 'No summary available.'
 
