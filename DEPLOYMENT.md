@@ -183,7 +183,7 @@ python trigger_review.py
 
 ## Your Live URLs (fill in after deploying)
 
-- **Frontend:** `https://___________________.vercel.app`
+- **Frontend:** `https://https://multi-agent-code-review-iota.vercel.app`
 - **Backend:** `https://___________________.onrender.com`
 - **API Docs:** `https://___________________.onrender.com/docs`
 
