@@ -153,7 +153,6 @@ You can now close ngrok permanently. Webhooks work even when your laptop is off 
 ---
 
 ## PART E - Final verification
-
 ### Test the live app:
 1. Open `https://multi-agent-code-review-system.vercel.app`
 2. Paste code or PR URL → Submit
@@ -169,7 +168,6 @@ python trigger_review.py
 ---
 
 ## Troubleshooting
-
 | Issue | Fix |
 |-------|-----|
 | Frontend shows CORS error | Check `ALLOWED_ORIGINS` on Render matches Vercel URL exactly (no trailing slash) |
