@@ -1,17 +1,17 @@
 """
 debug_response.py
-Run this to see the EXACT JSON the backend returns.
-Paste your bad code inline so we can see the full response shape.
+Run this 3 times in a row against the LIVE Render backend to check
+if agent results get mixed up across runs (backend bug) or stay
+correct (meaning the bug is in the frontend).
 
 Usage:
     python debug_response.py
-
-Server must be running: uvicorn backend.main:app --reload --port 8000
 """
 import json
 import requests
 
-# Small sample of bad code - enough to trigger all agents
+BASE_URL = "https://codesentinel-backend-cqfi.onrender.com"
+
 CODE = '''
 import os, subprocess
 API_KEY = "sk-prod-abc123"
@@ -39,27 +39,22 @@ def x(a,b,c):
 '''
 
 resp = requests.post(
-    "http://localhost:8000/review",
+    f"{BASE_URL}/review",
     json={"code": CODE},
-    timeout=300,
+    timeout=180,
 )
 
 print(f"Status: {resp.status_code}")
 data = resp.json()
 
-print("\n=== FULL RESPONSE STRUCTURE ===")
-print(json.dumps(data, indent=2, default=str))
-
-print("\n=== ISSUES PER AGENT ===")
-for agent in ["security", "performance", "logic", "style"]:
-    agent_data = data.get(agent, {})
+print("\n=== ISSUES PER AGENT (agent_name field vs dict key) ===")
+for agent_key in ["security", "performance", "logic", "style"]:
+    agent_data = data.get(agent_key, {})
     issues = agent_data.get("issues", [])
-    print(f"\n{agent.upper()}:")
+    print(f"\nDICT KEY: {agent_key}")
+    print(f"  agent_name field: {agent_data.get('agent_name')}")
     print(f"  score: {agent_data.get('score')}")
     print(f"  issues count: {len(issues)}")
-    print(f"  issues type: {type(issues)}")
     if issues:
-        print(f"  first issue keys: {list(issues[0].keys()) if issues else 'N/A'}")
-        print(f"  first issue: {issues[0]}")
-    else:
-        print(f"  raw issues value: {repr(issues)}")
+        # Print first issue description to fingerprint which agent's content this is
+        print(f"  first issue desc: {issues[0].get('description', '')[:80]}")
