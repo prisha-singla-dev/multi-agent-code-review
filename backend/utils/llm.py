@@ -20,11 +20,10 @@ except ImportError:
 
 _client = None
 
+# Reduced to top 2 models only — fail faster, hit OpenRouter sooner
 GEMINI_MODELS = [
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
 ]
 
 OPENROUTER_MODELS = [
@@ -71,12 +70,14 @@ async def _generate_openrouter(prompt: str) -> str:
         return data["choices"][0]["message"]["content"].strip()
 
 
-async def generate(prompt: str, retries: int = 2, json_mode: bool = True) -> str:
+async def generate(prompt: str, retries: int = 1, json_mode: bool = True) -> str:
     """
-    json_mode=True  -> sets response_mime_type=application/json (for agent prompts)
-    json_mode=False -> plain text response (for synthesizer recommendation)
+    retries=1: only 1 attempt per model before moving on (was 2).
+    Fewer Gemini models tried (2 instead of 4) before falling back to OpenRouter.
+    This makes a single agent fail-and-recover in ~10-15s instead of 60-90s.
     """
     gemini_client = get_client()
+    gemini_failed = False
 
     if gemini_client is not None:
         for model in GEMINI_MODELS:
@@ -102,22 +103,27 @@ async def generate(prompt: str, retries: int = 2, json_mode: bool = True) -> str
                     text = response.text.strip() if response.text else ""
                     if text:
                         return text
-                    print(f"[Gemini/{model}] Empty response - trying next model")
+                    print(f"[Gemini/{model}] Empty response - trying next")
                     break
                 except Exception as e:
                     err = str(e)
                     if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                        wait = (attempt + 1) * 10
-                        print(f"[Gemini/{model}] 429 - waiting {wait}s (attempt {attempt+1}/{retries})")
+                        wait = 5  # reduced from 10s — fail fast, let OpenRouter pick up
+                        print(f"[Gemini/{model}] 429 - waiting {wait}s")
                         await asyncio.sleep(wait)
                     else:
-                        print(f"[Gemini/{model}] Error: {e} - trying next model")
+                        print(f"[Gemini/{model}] Error: {e}")
                         break
-
-        print("[Gemini] All models exhausted - falling back to OpenRouter")
+        gemini_failed = True
+        print("[Gemini] Exhausted - falling back to OpenRouter")
 
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-    if openrouter_key and openrouter_key != "your_openrouter_key_here":
+    has_openrouter = bool(openrouter_key and openrouter_key != "your_openrouter_key_here")
+
+    if not has_openrouter and gemini_failed:
+        print("[CRITICAL] Gemini failed AND OPENROUTER_API_KEY not set on this environment!")
+
+    if has_openrouter:
         try:
             result = await _generate_openrouter(prompt)
             print(f"[OpenRouter] Success")
@@ -228,12 +234,8 @@ def safe_parse(raw: str, agent_name: str) -> dict:
         parsed.setdefault("issues", [])
         parsed.setdefault("summary", "No summary provided.")
         parsed.setdefault("score", 50)
-
-        # Defensive: if "issues" itself isn't a list, force empty list
         if not isinstance(parsed["issues"], list):
-            print(f"[{agent_name}] 'issues' field is not a list: {type(parsed['issues'])} - {parsed['issues']}")
             parsed["issues"] = []
-
         return parsed
     except Exception as e:
         print(f"[{agent_name}] safe_parse error: {e}\nFull raw ({len(raw)} chars):\n{raw}\n---")
