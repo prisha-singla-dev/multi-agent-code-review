@@ -1,7 +1,7 @@
 """
 backend/utils/llm.py
 Primary:  Google Gemini (native google-genai SDK)
-Fallback: OpenRouter free models (via httpx)
+Fallback: OpenRouter free models (via httpx) — tries multiple models in order
 """
 
 import asyncio
@@ -20,16 +20,18 @@ except ImportError:
 
 _client = None
 
-# Reduced to top 2 models only — fail faster, hit OpenRouter sooner
 GEMINI_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.0-flash",
 ]
 
+# Order: coding-tuned model first, then strong general models, then small fast ones.
 OPENROUTER_MODELS = [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "google/gemma-2-9b-it:free",
+    "qwen/qwen3-coder:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "openai/gpt-oss-120b:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
 ]
 
 
@@ -43,39 +45,62 @@ def get_client():
 
 
 async def _generate_openrouter(prompt: str) -> str:
+    """
+    Tries each OpenRouter free model in order until one succeeds.
+    Handles per-model overload/rate-limit by moving to the next model
+    immediately rather than retrying the same one.
+    """
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if not api_key or api_key == "your_openrouter_key_here":
         raise RuntimeError("OPENROUTER_API_KEY not set")
-    model = os.getenv("OPENROUTER_MODEL", OPENROUTER_MODELS[0])
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/codesentinel",
         "X-Title": "CodeSentinel",
     }
-    body = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 4000,
-        "temperature": 0.1,
-    }
+
+    # Allow override via env var for a single specific model, else try the list
+    forced_model = os.getenv("OPENROUTER_MODEL", "").strip()
+    models_to_try = [forced_model] if forced_model else OPENROUTER_MODELS
+
+    last_error = None
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=body,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+        for model in models_to_try:
+            try:
+                body = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 4000,
+                    "temperature": 0.1,
+                }
+                resp = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=body,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    if content:
+                        print(f"[OpenRouter/{model}] Success")
+                        return content
+                    print(f"[OpenRouter/{model}] Empty response — trying next model")
+                    continue
+                else:
+                    print(f"[OpenRouter/{model}] HTTP {resp.status_code}: {resp.text[:200]} — trying next model")
+                    last_error = f"HTTP {resp.status_code}"
+                    continue
+            except Exception as e:
+                print(f"[OpenRouter/{model}] Error: {e} — trying next model")
+                last_error = str(e)
+                continue
+
+    raise RuntimeError(f"All OpenRouter models failed. Last error: {last_error}")
 
 
 async def generate(prompt: str, retries: int = 1, json_mode: bool = True) -> str:
-    """
-    retries=1: only 1 attempt per model before moving on (was 2).
-    Fewer Gemini models tried (2 instead of 4) before falling back to OpenRouter.
-    This makes a single agent fail-and-recover in ~10-15s instead of 60-90s.
-    """
     gemini_client = get_client()
     gemini_failed = False
 
@@ -108,7 +133,7 @@ async def generate(prompt: str, retries: int = 1, json_mode: bool = True) -> str
                 except Exception as e:
                     err = str(e)
                     if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                        wait = 5  # reduced from 10s — fail fast, let OpenRouter pick up
+                        wait = 5
                         print(f"[Gemini/{model}] 429 - waiting {wait}s")
                         await asyncio.sleep(wait)
                     else:
@@ -126,15 +151,14 @@ async def generate(prompt: str, retries: int = 1, json_mode: bool = True) -> str
     if has_openrouter:
         try:
             result = await _generate_openrouter(prompt)
-            print(f"[OpenRouter] Success")
             return result
         except Exception as e:
-            print(f"[OpenRouter] Failed: {e}")
+            print(f"[OpenRouter] All models failed: {e}")
 
     raise RuntimeError(
         "All LLM providers failed.\n"
         "  • Set DEMO_MODE=true for instant mock data\n"
-        "  • Or set OPENROUTER_API_KEY in .env"
+        "  • Or check OPENROUTER_API_KEY in .env"
     )
 
 
