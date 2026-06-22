@@ -13,11 +13,11 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
-      - key: OPENROUTER_MODEL
-        value: "meta-llama/llama-3.1-8b-instruct:free"
       - key: GITHUB_TOKEN
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
       - key: PYTHON_VERSION
         value: "3.10.12"
+      - key: ALLOWED_ORIGINS
+        value: "https://multi-agent-code-review-iota.vercel.app"
