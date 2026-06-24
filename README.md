@@ -1,71 +1,73 @@
-# 🤖 CodeSentinel - Multi-Agent AI Code Review System
+# 🤖 CodeSentinel — Multi-Agent AI Code Review System
 
-> Automated code review powered by 4 specialized AI agents. Paste code or connect a GitHub PR - get a structured review with severity levels, line-specific findings, and a final engineering verdict in seconds.
+> Automated code review powered by 4 specialized AI agents. Paste code or connect a GitHub PR — get a structured review with severity levels, line-specific findings, and a final engineering verdict in seconds.
+
+🔗 **Live Demo:** [multi-agent-code-review-iota.vercel.app](https://multi-agent-code-review-iota.vercel.app)
+📡 **API:** [codesentinel-backend-cqfi.onrender.com](https://codesentinel-backend-cqfi.onrender.com/docs)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)
-![LangGraph](https://img.shields.io/badge/LangGraph-orchestrator-orange)
-![React](https://img.shields.io/badge/React-Vite-61DAFB?logo=react)
-![Gemini](https://img.shields.io/badge/Gemini-2.5Flash-4285F4?logo=google)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi)
+![LangGraph](https://img.shields.io/badge/LangGraph-StateGraph-orange)
+![React](https://img.shields.io/badge/React_18-Vite-61DAFB?logo=react)
+![Gemini](https://img.shields.io/badge/Gemini-2.5_Flash-4285F4?logo=google)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## ✨ What It Does
 
-CodeSentinel runs your code through 4 independent AI agents simultaneously, each specialized in a different review dimension:
+CodeSentinel runs your code through 4 independent AI agents, each specializing in a different review dimension. A **Senior Engineer synthesizer** then merges all findings into a final go/no-go verdict with an overall score out of 100.
 
-| Agent | Focus |
-|-------|-------|
-| 🔒 **SecurityAgent** | SQL injection, XSS, hardcoded secrets, OWASP Top 10 |
-| ⚡ **PerformanceAgent** | N+1 queries, O(n²) complexity, memory leaks, caching |
-| 🧠 **LogicAgent** | Edge cases, null handling, off-by-one errors, silent failures |
-| ✨ **StyleAgent** | PEP8, naming conventions, DRY violations, type hints |
-
-A **Senior Engineer synthesizer** then merges all findings into a final go/no-go recommendation with an overall score.
+| Agent | Focus Areas |
+|-------|------------|
+| 🔒 **SecurityAgent** | SQL injection, XSS, hardcoded secrets, OWASP Top 10, shell injection |
+| ⚡ **PerformanceAgent** | N+1 queries, O(n²) complexity, memory leaks, inefficient loops |
+| 🧠 **LogicAgent** | Edge cases, null handling, off-by-one errors, silent failures, division by zero |
+| ✨ **StyleAgent** | PEP8, naming conventions, DRY violations, missing type hints, docstrings |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-GitHub PR / Pasted Code
-         │
-         ▼
-   FastAPI Backend
-         │
-         ▼
-  LangGraph Orchestrator
-    ┌────┴────┐
-    │         │  Sequential execution (rate-limit safe)
-    ▼         ▼
-SecurityAgent  PerformanceAgent  LogicAgent  StyleAgent
-    │               │               │            │
-    └───────────────┴───────────────┴────────────┘
-                         │
-                         ▼
-              Synthesizer (Senior Engineer LLM)
-                         │
-                         ▼
-            Structured Review + Score + Verdict
-                         │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-        React Frontend        GitHub PR Comment
+GitHub PR URL / Pasted Code
+           │
+           ▼
+     FastAPI Backend
+           │
+           ▼
+   LangGraph Orchestrator
+  (Sequential — rate-limit safe)
+           │
+    ┌──────┼──────┬──────┐
+    ▼      ▼      ▼      ▼
+Security Perf  Logic  Style
+Agent    Agent  Agent  Agent
+    └──────┼──────┴──────┘
+           │
+           ▼
+  Synthesizer (Senior Engineer LLM)
+           │
+     ┌─────┴─────┐
+     ▼           ▼
+React UI    GitHub PR Comment
+(live)      (auto-posted)
 ```
 
 ---
 
 ## 🚀 Features
 
-- **4 specialized AI agents** - each focused on one review dimension
-- **LangGraph orchestration** - sequential pipeline with error recovery per agent
-- **GitHub webhook integration** - auto-reviews every PR on open/sync/reopen
-- **GitHub PR comment** - posts structured Markdown review directly on the PR
-- **React frontend** - paste code or enter a GitHub PR URL for instant review
-- **Severity levels** - CRITICAL / HIGH / MEDIUM / LOW / INFO with line numbers
-- **Model fallback chain** - Gemini 2.5 Flash → 2.5 Flash Lite → 2.0 Flash → OpenRouter free
-- **Demo mode** - instant mock responses for demos without API quota
+- **4 specialized AI agents** — each focused on one review dimension with per-agent error recovery
+- **LangGraph StateGraph orchestration** — sequential pipeline, safe fallback if any agent fails
+- **7-model LLM fallback chain** — Gemini 2.5 Flash → Gemini 2.0 Flash → 5 OpenRouter free models, so it never goes down
+- **GitHub webhook integration** — auto-reviews every PR on open / synchronize / reopen
+- **Automated PR comments** — posts structured Markdown review with severity levels directly on the PR
+- **React frontend** — paste code or enter a GitHub PR URL for instant review
+- **Severity levels** — CRITICAL / HIGH / MEDIUM / LOW / INFO with line-specific references
+- **HMAC-SHA256 webhook verification** — cryptographically verifies every GitHub payload
+- **Demo mode** — instant mock responses for demos without consuming API quota
+- **Zero cost** — fully deployed on free tier (Render + Vercel)
 
 ---
 
@@ -74,12 +76,14 @@ SecurityAgent  PerformanceAgent  LogicAgent  StyleAgent
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.10, FastAPI, Uvicorn |
-| Orchestration | LangGraph (StateGraph) |
-| AI Models | Google Gemini 2.5 Flash (primary), OpenRouter free models (fallback) |
-| Frontend | React 18, Vite, TailwindCSS |
-| Webhook | GitHub Webhooks + HMAC-SHA256 verification |
+| Orchestration | LangGraph (StateGraph), LangChain Core |
+| AI — Primary | Google Gemini 2.5 Flash, Gemini 2.0 Flash |
+| AI — Fallback | OpenRouter: qwen3-coder, llama-3.3-70b, gpt-oss-120b (all free) |
+| Frontend | React 18, Vite |
+| Webhook Security | HMAC-SHA256 signature verification |
 | HTTP Client | httpx (async) |
-| Tunnel (dev) | ngrok |
+| Deployment | Render (backend), Vercel (frontend) |
+| Dev Tunnel | ngrok (local webhook testing) |
 
 ---
 
@@ -88,15 +92,15 @@ SecurityAgent  PerformanceAgent  LogicAgent  StyleAgent
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- Google Gemini API key (free at [aistudio.google.com](https://aistudio.google.com))
+- Google Gemini API key — free at [aistudio.google.com](https://aistudio.google.com)
 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/prisha-singla-dev/Multi-Agent-Code-Review-System.git
-cd Multi-Agent-Code-Review-System
-python -m venv venv
+git clone https://github.com/prisha-singla-dev/multi-agent-code-review.git
+cd multi-agent-code-review
 
+python -m venv venv
 # Windows
 venv\Scripts\activate
 # Mac/Linux
@@ -113,15 +117,18 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
-# Required for real reviews
-GEMINI_API_KEY=your_key_here
+# AI provider (primary)
+GEMINI_API_KEY=your_gemini_key_here
 
-# Set to true for instant demo without API key
-DEMO_MODE=false
+# AI provider (fallback — free at openrouter.ai)
+OPENROUTER_API_KEY=your_openrouter_key_here
 
-# Required for GitHub webhook integration
+# GitHub integration
 GITHUB_TOKEN=ghp_your_token_here
-GITHUB_WEBHOOK_SECRET=your_secret_here
+GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
+
+# Set true for instant demo without any API calls
+DEMO_MODE=false
 ```
 
 ### 3. Start backend
@@ -138,40 +145,49 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
 ## 🔗 GitHub Webhook Setup
 
-To get automatic PR reviews posted as comments:
+For automatic PR reviews posted as comments:
 
-1. **Expose your local server:**
-   ```bash
-   ngrok http 8000
-   ```
+### Local development (ngrok)
 
-2. **Register on GitHub:**
-   - Repo → Settings → Webhooks → Add webhook
-   - Payload URL: `https://YOUR-NGROK-URL.ngrok-free.app/webhook/github`
-   - Content type: `application/json`
-   - Secret: your `GITHUB_WEBHOOK_SECRET`
-   - Events: **Pull requests** only
+```bash
+# Terminal 1 — backend
+uvicorn backend.main:app --reload --port 8000
 
-3. **Open a PR** - CodeSentinel automatically posts a structured review comment.
+# Terminal 2 — expose to internet
+ngrok http 8000
+```
 
-See [WEBHOOK_SETUP.md](./WEBHOOK_SETUP.md) for detailed instructions.
+Register on GitHub: **Repo → Settings → Webhooks → Add webhook**
+- Payload URL: `https://YOUR-NGROK-URL.ngrok-free.app/webhook/github`
+- Content type: `application/json`
+- Secret: your `GITHUB_WEBHOOK_SECRET`
+- Events: **Pull requests** only
+
+### Production (already done if deployed)
+
+Webhook URL: `https://codesentinel-backend-cqfi.onrender.com/webhook/github`
+
+> ⚠️ Render free tier sleeps after 15 min idle. GitHub's webhook timeout is 10s — the first delivery after a cold start may fail. Re-deliver from GitHub → Settings → Webhooks → Recent Deliveries if this happens.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run webhook test suite (server must be running)
+# Full webhook test suite (server must be running)
 python test_webhook.py
 
-# Manually trigger a review on a real PR
+# Manually trigger a real review on a deployed PR
 python trigger_review.py
+
+# Debug: inspect raw API response shape from live backend
+python debug_response.py
 ```
 
 ---
@@ -181,93 +197,109 @@ python trigger_review.py
 ```
 multi-agent-code-review/
 ├── backend/
-│   ├── main.py                    # FastAPI app entry point
-│   ├── webhook.py                 # GitHub webhook receiver
+│   ├── main.py                    # FastAPI app, CORS, routes
+│   ├── webhook.py                 # GitHub webhook receiver + PR comment formatter
 │   ├── agents/
-│   │   ├── security_agent.py      # OWASP, injection, secrets
-│   │   ├── performance_agent.py   # Complexity, N+1, caching
-│   │   ├── logic_agent.py         # Edge cases, null handling
-│   │   └── style_agent.py         # PEP8, naming, DRY
+│   │   ├── security_agent.py      # OWASP, injections, hardcoded secrets
+│   │   ├── performance_agent.py   # Complexity, N+1, memory
+│   │   ├── logic_agent.py         # Edge cases, null handling, silent failures
+│   │   └── style_agent.py         # PEP8, naming, DRY, type hints
 │   ├── orchestrator/
-│   │   └── graph.py               # LangGraph StateGraph pipeline
+│   │   └── graph.py               # LangGraph StateGraph pipeline + synthesizer
 │   ├── models/
-│   │   └── schemas.py             # Pydantic request/response models
+│   │   └── schemas.py             # Pydantic models (Issue, AgentReview, ReviewResponse)
 │   └── utils/
-│       ├── llm.py                 # Gemini + OpenRouter with fallback
+│       ├── llm.py                 # 7-model fallback chain (Gemini + OpenRouter)
 │       ├── github.py              # GitHub PR diff fetcher
-│       └── mock_review.py         # Demo mode mock data
+│       └── mock_review.py         # Demo mode realistic mock data
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                # Main React component
-│   │   └── components/            # Review display components
-│   └── vite.config.js
-├── test_webhook.py                # Webhook test suite
-├── trigger_review.py              # Manual PR review trigger
-├── test_bad_code.py               # Sample buggy code for demos
-├── .env.example
-├── requirements.txt
+│   │   ├── App.jsx                # Main app shell, routing, state
+│   │   └── components/
+│   │       ├── CodeInput.jsx      # Code editor + PR URL input
+│   │       └── ReviewResults.jsx  # Agent cards, score rings, issue display
+│   ├── vercel.json                # SPA routing config
+│   └── vite.config.js             # Dev proxy + build config
+├── test_webhook.py                # 6-test webhook suite
+├── trigger_review.py              # Manual PR trigger against live backend
+├── debug_response.py              # Raw API response inspector
+├── test_bad_code.py               # Intentionally buggy code for demos
+├── render.yaml                    # Render deployment config
+├── .env.example                   # Environment variable template
+├── requirements.txt               # Pinned Python dependencies
+├── DEPLOYMENT.md                  # Full Render + Vercel deployment guide
 └── README.md
 ```
 
 ---
 
-## 🔑 API Endpoints
+## 🔑 API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` | Health check |
-| `GET` | `/health` | Status + config info |
-| `POST` | `/review` | Submit code or PR URL for review |
-| `POST` | `/webhook/github` | GitHub webhook receiver |
-| `POST` | `/webhook/trigger` | Manual review trigger (testing) |
+| `GET` | `/` | Service status |
+| `GET` | `/health` | Health check + config info |
+| `POST` | `/review` | Submit code or PR URL for multi-agent review |
+| `POST` | `/webhook/github` | GitHub webhook receiver (HMAC verified) |
+| `POST` | `/webhook/trigger` | Manual review trigger for testing |
 
-Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+Interactive docs (live): [codesentinel-backend-cqfi.onrender.com/docs](https://codesentinel-backend-cqfi.onrender.com/docs)
 
 ---
 
-## 🎯 Demo
+## 🎯 Sample Review Output
 
-**Demo mode** (no API key needed):
-```env
-DEMO_MODE=true
 ```
+🔒 Security Agent — Score: 10/100
+  🔴 [CRITICAL] (line 12) Hardcoded API key found in source code
+     💡 Use os.getenv('API_KEY') or a secrets manager
 
-**Sample review output:**
-```
-🔒 Security Agent - Score: 10/100
-  🔴 [CRITICAL] (line 12) Hardcoded API key found
-     💡 Use os.getenv('API_KEY') instead
+  🔴 [CRITICAL] (line 20) SQL injection via unsanitized user input
+     💡 Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = %s', (id,))
 
-⚡ Performance Agent - Score: 60/100
-  🟠 [HIGH] (line 44) O(n²) complexity in find_duplicates
+⚡ Performance Agent — Score: 60/100
+  🟠 [HIGH] (line 44) O(n²) complexity in find_duplicates()
      💡 Use a set for O(n) duplicate detection
 
-📋 Final Recommendation
-No, the code is not ready to merge. Critical security vulnerabilities
-including hardcoded secrets and SQL injection must be resolved first.
+🧠 Logic Agent — Score: 70/100
+  🟠 [HIGH] (line 58) Division by zero not handled
+     💡 Add: if b == 0: raise ValueError("b cannot be zero")
 
-Overall Score: 47/100 | Total Issues: 11
+✨ Style Agent — Score: 80/100
+  🟡 [MEDIUM] (line 3) Function name 'x' is not descriptive
+     💡 Rename to reflect purpose (e.g., 'calculate_total')
+
+📋 Final Recommendation
+This code is not ready to merge. The most critical concerns are the
+hardcoded API key and SQL injection vulnerability which pose immediate
+security risks. Resolve all CRITICAL issues before resubmitting.
+
+Overall Score: 55/100 | Total Issues: 8
 ```
 
 ---
 
 ## 🌐 Deployment
 
-- **Backend:** [Render](https://render.com) (free tier)
-- **Frontend:** [Vercel](https://vercel.com) (free tier)
+Fully deployed on free tier — no credit card required.
 
-Deployment guide coming soon.
+| Service | Provider | URL |
+|---------|----------|-----|
+| Frontend | Vercel | [multi-agent-code-review-iota.vercel.app](https://multi-agent-code-review-iota.vercel.app) |
+| Backend | Render | [codesentinel-backend-cqfi.onrender.com](https://codesentinel-backend-cqfi.onrender.com) |
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full step-by-step deployment guide.
 
 ---
 
 ## 📄 License
 
-MIT - free to use, fork, and build on.
+MIT — free to use, fork, and build on.
 
 ---
 
 ## 🙋 Author
 
-**Prisha Singla** - [GitHub](https://github.com/prisha-singla-dev)
+**Prisha Singla** — [GitHub](https://github.com/prisha-singla-dev) · [LinkedIn](https://linkedin.com/in/prisha-singla)
 
-Built as a portfolio project demonstrating multi-agent AI system design, LangGraph orchestration, and production-grade API development.
+Built as a portfolio project demonstrating multi-agent AI system design, LangGraph orchestration, production-grade reliability engineering, and full-stack deployment.
