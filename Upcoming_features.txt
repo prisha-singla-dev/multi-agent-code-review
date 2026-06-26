@@ -1,0 +1,16 @@
+multi-agent-code review 
+FEATURES YOU SHOULD ADD TO MAKE IT LOOK CLIENT-WORTHY
+1. GitHub PR Integration - Massive credibility boost.
+2. Review Summary Dashboard - Makes it look production-ready.
+4. Security Detection - Huge perceived value.
+5. Cost Tracking - Fits your AI infra niche.
+6. Review Analytics - Very “enterprise”.
+7. Multi-LLM Routing - This is BIG.
+8. Tracking Hisory across PRs
+9. Provide actual filenames and line numbers for the errors
+10. Test Agent 
+11. CodeFix Suggestion
+12. Full Agent Conflict handling
+13. Multilingual support
+14. Confidence Scoring layer
+
